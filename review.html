@@ -28,7 +28,7 @@ input[type="number"] {
   padding: 6px;
   font-size: 16px;
 }
-.controls, .review {
+.controls, .review, .logbox {
   background: white;
   padding: 12px;
   margin-bottom: 12px;
@@ -55,6 +55,17 @@ nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.logbox {
+  font-family: monospace;
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #111;
+  color: #0f0;
+}
+.logbox b {
+  color: #6cf;
 }
 </style>
 </head>
@@ -124,28 +135,64 @@ nav {
 
 </div>
 
+<div class="logbox" id="logbox">
+  <b>Debug Log:</b><br>
+</div>
+
 <script>
 let entries = [];
-let filesByName = {};
+let filesByKey = {};
 let order = [];
 let index = 0;
 
+/* ---------- DEBUG LOG ---------- */
+function log(msg) {
+  const box = document.getElementById("logbox");
+  box.innerHTML += msg + "<br>";
+  box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- NORMALIZATION ---------- */
+function normalize(name) {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/\.[^.]+$/, "");
+}
+
 function startReview() {
+  log("<b>Start Review</b>");
+
   try {
     const data = JSON.parse(document.getElementById("jsonInput").value);
     entries = data.entries.map(e => ({
       ...e,
       confirmed: e.confirmed === true
     }));
+    log("JSON geladen: " + entries.length + " Einträge");
   } catch {
     alert("Ungültiges JSON");
     return;
   }
 
-  filesByName = {};
-  for (const f of document.getElementById("imageInput").files) {
-    filesByName[f.name] = f;
+  filesByKey = {};
+  const files = document.getElementById("imageInput").files;
+
+  for (const f of files) {
+    const key = normalize(f.name);
+    filesByKey[key] = f;
+    log("Upload: " + f.name + " → key=" + key);
   }
+
+  entries.forEach(e => {
+    const key = normalize(e.image);
+    if (filesByKey[key]) {
+      log("MATCH ✔ " + e.image);
+    } else {
+      log("MISS ✖ " + e.image + " (key=" + key + ")");
+    }
+  });
 
   loadState();
   applyFilter();
@@ -179,18 +226,19 @@ function render() {
   document.getElementById("progress").innerText =
     `Eintrag ${index + 1} / ${order.length} | confirmed: ${entry.confirmed}`;
 
-  document.getElementById("level").value = entry.level ?? "";
-  document.getElementById("value").value = entry.value ?? "";
-  document.getElementById("cost").value = entry.cost ?? "";
+  level.value = entry.level ?? "";
+  value.value = entry.value ?? "";
+  cost.value = entry.cost ?? "";
 
   const imgDiv = document.getElementById("imageContainer");
   imgDiv.innerHTML = "";
 
-  const file = filesByName[entry.image];
+  const key = normalize(entry.image);
+  const file = filesByKey[key];
+
   if (file) {
     const img = document.createElement("img");
     img.src = URL.createObjectURL(file);
-    img.onclick = () => img.classList.toggle("zoom");
     imgDiv.appendChild(img);
   } else {
     imgDiv.innerHTML = "<b>⚠️ Bild nicht vorhanden</b>";
@@ -219,7 +267,7 @@ function abort() {
 }
 
 function jumpToLevel() {
-  const lvl = Number(document.getElementById("jumpLevel").value);
+  const lvl = Number(jumpLevel.value);
   const idx = order.findIndex(i => entries[i].level === lvl);
   if (idx !== -1) {
     index = idx;
@@ -267,6 +315,7 @@ function loadState() {
     const st = JSON.parse(s);
     entries = st.entries;
     index = st.index || 0;
+    log("State wiederhergestellt");
   } catch {}
 }
 </script>
