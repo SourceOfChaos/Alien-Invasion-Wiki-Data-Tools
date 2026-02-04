@@ -26,20 +26,17 @@ let radiusPx = null;
 let radiusGame = null;
 let unitPerPx = null;
 
+/* Drag helpers */
+let lastDragDist = null;
+
 /* ---------------- Helpers ---------------- */
 
 function svgPoint(evt) {
-  const rect = svg.getBoundingClientRect();
   const e = evt.touches ? evt.touches[0] : evt;
-
-  // Berechne Position innerhalb des SVG viewBox
   const pt = svg.createSVGPoint();
   pt.x = e.clientX;
   pt.y = e.clientY;
-  const ctm = svg.getScreenCTM().inverse();
-  const svgPt = pt.matrixTransform(ctm);
-
-  return { x: svgPt.x, y: svgPt.y };
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
 }
 
 function clearSVG() {
@@ -102,6 +99,7 @@ radiusBtn.onclick = () => {
 
     radiusState = "CONFIRMED";
     radiusBtn.textContent = "Fangradius gesetzt";
+    svg.style.touchAction = "auto";
     redraw();
   }
 };
@@ -123,20 +121,24 @@ svg.addEventListener("pointerdown", e => {
     rois = [radiusROI];
     radiusState = "EDITING";
     radiusBtn.textContent = "Fangradius bestätigen";
+    svg.style.touchAction = "none";
     redraw();
     return;
   }
 
   if (radiusState === "EDITING") {
     const dCenter = Math.hypot(pt.x - radiusROI.cx, pt.y - radiusROI.cy);
+
     if (dCenter < 12) {
       dragging = "center";
-      return;
-    }
-    if (Math.abs(dCenter - radiusROI.r) < 12) {
+    } else if (Math.abs(dCenter - radiusROI.r) < 12) {
       dragging = "edge";
+      lastDragDist = dCenter;
+    } else {
       return;
     }
+
+    svg.setPointerCapture(e.pointerId);
   }
 });
 
@@ -150,14 +152,26 @@ svg.addEventListener("pointermove", e => {
   }
 
   if (dragging === "edge") {
-    radiusROI.r = Math.max(10, Math.hypot(pt.x - radiusROI.cx, pt.y - radiusROI.cy));
+    const d = Math.hypot(pt.x - radiusROI.cx, pt.y - radiusROI.cy);
+    const delta = d - lastDragDist;
+
+    if (Math.abs(delta) > 1) {
+      radiusROI.r = Math.max(10, radiusROI.r + delta);
+      lastDragDist = d;
+    }
   }
 
   redraw();
 });
 
-svg.addEventListener("pointerup", () => {
+svg.addEventListener("pointerup", e => {
+  if (dragging) {
+    try {
+      svg.releasePointerCapture(e.pointerId);
+    } catch {}
+  }
   dragging = null;
+  lastDragDist = null;
 });
 
 /* ---------------- ROI Buttons ---------------- */
