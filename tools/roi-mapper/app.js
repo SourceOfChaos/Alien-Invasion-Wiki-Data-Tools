@@ -4,19 +4,20 @@ const rectBtn = document.getElementById("rectBtn");
 const polyBtn = document.getElementById("polyBtn");
 const exportBtn = document.getElementById("exportBtn");
 
-let mode = null;
-let rois = [];
-let activeRoiId = null;
+let imgEl = null;
+let bitmap = null;
 
-let img = null;
+let rois = [];
+let mode = null;
 let startPt = null;
 let drawingPoly = null;
 
-let radiusGameUnits = null;
+/* Radius reference */
 let radiusPx = null;
+let radiusGame = null;
 let unitPerPx = null;
 
-/* ---------- Helpers ---------- */
+/* ---------------- Helpers ---------------- */
 
 function svgPoint(evt) {
   const rect = svg.getBoundingClientRect();
@@ -33,11 +34,11 @@ function clearSVG() {
 
 function redraw() {
   clearSVG();
-  if (img) svg.appendChild(img);
+  if (imgEl) svg.appendChild(imgEl);
   rois.forEach(drawROI);
 }
 
-/* ---------- Image Load ---------- */
+/* ---------------- Image Load (FIXED) ---------------- */
 
 imageInput.addEventListener("change", e => {
   const file = e.target.files[0];
@@ -45,53 +46,65 @@ imageInput.addEventListener("change", e => {
 
   const reader = new FileReader();
   reader.onload = () => {
-    img = document.createElementNS("http://www.w3.org/2000/svg", "image");
-    img.setAttribute("href", reader.result);
-    img.onload = () => {
-      svg.setAttribute("viewBox", `0 0 ${img.width.baseVal.value} ${img.height.baseVal.value}`);
+    bitmap = new Image();
+    bitmap.onload = () => {
+      imgEl = document.createElementNS("http://www.w3.org/2000/svg", "image");
+      imgEl.setAttribute("href", reader.result);
+      imgEl.setAttribute("x", 0);
+      imgEl.setAttribute("y", 0);
+      imgEl.setAttribute("width", bitmap.width);
+      imgEl.setAttribute("height", bitmap.height);
+
+      svg.setAttribute("viewBox", `0 0 ${bitmap.width} ${bitmap.height}`);
+      svg.setAttribute("width", bitmap.width);
+      svg.setAttribute("height", bitmap.height);
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
       redraw();
     };
+    bitmap.src = reader.result;
   };
   reader.readAsDataURL(file);
 });
 
-/* ---------- Radius ROI ---------- */
+/* ---------------- Interaction ---------------- */
 
 svg.addEventListener("pointerdown", e => {
-  if (!img) return;
+  if (!imgEl) return;
+  startPt = svgPoint(e);
 
-  if (!radiusPx) {
-    startPt = svgPoint(e);
-  } else if (mode === "rect") {
-    startPt = svgPoint(e);
-  } else if (mode === "poly") {
-    const p = svgPoint(e);
-    drawingPoly.points.push(p);
+  if (mode === "poly" && drawingPoly) {
+    drawingPoly.points.push(startPt);
     redraw();
+    startPt = null;
   }
 });
 
 svg.addEventListener("pointerup", e => {
-  if (!startPt || !img) return;
+  if (!startPt || !imgEl) return;
   const end = svgPoint(e);
 
-  /* ---- Radius circle ---- */
+  /* ----- Radius first ----- */
   if (!radiusPx) {
     const r = Math.hypot(end.x - startPt.x, end.y - startPt.y);
-    const gameRadius = Number(prompt("Fangradius im Spiel (Einheiten)?"));
-    if (!gameRadius || r < 5) {
+    if (r < 10) {
+      startPt = null;
+      return;
+    }
+
+    const gameR = Number(prompt("Fangradius im Spiel (Einheiten)?"));
+    if (!gameR || gameR <= 0) {
       startPt = null;
       return;
     }
 
     radiusPx = r;
-    radiusGameUnits = gameRadius;
-    unitPerPx = radiusGameUnits / radiusPx;
+    radiusGame = gameR;
+    unitPerPx = radiusGame / radiusPx;
 
     rois.push({
-      id: crypto.randomUUID(),
-      name: "Radius",
       type: "circle",
+      name: "Radius",
       cx: startPt.x,
       cy: startPt.y,
       r
@@ -102,15 +115,17 @@ svg.addEventListener("pointerup", e => {
     return;
   }
 
-  /* ---- Rectangle ---- */
+  /* ----- Rectangle ----- */
   if (mode === "rect") {
     const name = prompt("ROI Name?");
-    if (!name) return;
+    if (!name) {
+      startPt = null;
+      return;
+    }
 
     rois.push({
-      id: crypto.randomUUID(),
-      name,
       type: "rect",
+      name,
       x: Math.min(startPt.x, end.x),
       y: Math.min(startPt.y, end.y),
       w: Math.abs(end.x - startPt.x),
@@ -122,33 +137,39 @@ svg.addEventListener("pointerup", e => {
   }
 });
 
-/* ---------- Polygon Finish ---------- */
-
-polyBtn.addEventListener("dblclick", () => {
-  if (!drawingPoly || drawingPoly.points.length < 3) return;
-  drawingPoly = null;
-  redraw();
+/* Finish polygon with double click */
+svg.addEventListener("dblclick", () => {
+  if (drawingPoly && drawingPoly.points.length >= 3) {
+    drawingPoly = null;
+    redraw();
+  }
 });
 
-/* ---------- Buttons ---------- */
+/* ---------------- Buttons ---------------- */
 
 rectBtn.onclick = () => {
-  if (!unitPerPx) return alert("Zuerst Radius setzen!");
+  if (!unitPerPx) {
+    alert("Zuerst Fangradius setzen!");
+    return;
+  }
   mode = "rect";
 };
 
 polyBtn.onclick = () => {
-  if (!unitPerPx) return alert("Zuerst Radius setzen!");
-  mode = "poly";
+  if (!unitPerPx) {
+    alert("Zuerst Fangradius setzen!");
+    return;
+  }
   const name = prompt("ROI Name?");
   if (!name) return;
+
   drawingPoly = {
-    id: crypto.randomUUID(),
-    name,
     type: "poly",
+    name,
     points: []
   };
   rois.push(drawingPoly);
+  mode = "poly";
 };
 
 exportBtn.onclick = () => {
@@ -171,18 +192,17 @@ exportBtn.onclick = () => {
       return {
         name: r.name,
         type: "rectangle",
-        bounds: {
-          x: r.x * unitPerPx,
-          y: r.y * unitPerPx,
-          w: r.w * unitPerPx,
-          h: r.h * unitPerPx
-        }
+        x: r.x * unitPerPx,
+        y: r.y * unitPerPx,
+        w: r.w * unitPerPx,
+        h: r.h * unitPerPx
       };
     }
 
     if (r.type === "poly") {
       const xs = r.points.map(p => p.x);
       const ys = r.points.map(p => p.y);
+
       return {
         name: r.name,
         type: "polygon",
@@ -200,14 +220,16 @@ exportBtn.onclick = () => {
     }
   });
 
-  const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(out, null, 2)], {
+    type: "application/json"
+  });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "roi-export.json";
   a.click();
 };
 
-/* ---------- Drawing ---------- */
+/* ---------------- Drawing ---------------- */
 
 function drawROI(r) {
   if (r.type === "circle") {
@@ -215,7 +237,7 @@ function drawROI(r) {
     c.setAttribute("cx", r.cx);
     c.setAttribute("cy", r.cy);
     c.setAttribute("r", r.r);
-    c.setAttribute("fill", "rgba(150,150,150,0.15)");
+    c.setAttribute("fill", "rgba(180,180,180,0.2)");
     c.setAttribute("stroke", "#aaa");
     c.setAttribute("stroke-width", 2);
     svg.appendChild(c);
@@ -227,43 +249,47 @@ function drawROI(r) {
     el.setAttribute("y", r.y);
     el.setAttribute("width", r.w);
     el.setAttribute("height", r.h);
-    el.setAttribute("fill", "rgba(0,200,255,0.2)");
+    el.setAttribute("fill", "rgba(0,200,255,0.25)");
     el.setAttribute("stroke", "#0cf");
     el.setAttribute("stroke-width", 2);
     svg.appendChild(el);
   }
 
   if (r.type === "poly") {
-    const el = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-    el.setAttribute(
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    p.setAttribute(
       "points",
-      r.points.map(p => `${p.x},${p.y}`).join(" ")
+      r.points.map(pt => `${pt.x},${pt.y}`).join(" ")
     );
-    el.setAttribute("fill", "rgba(255,200,0,0.2)");
-    el.setAttribute("stroke", "#fc0");
-    el.setAttribute("stroke-width", 2);
-    svg.appendChild(el);
+    p.setAttribute("fill", "rgba(255,200,0,0.25)");
+    p.setAttribute("stroke", "#fc0");
+    p.setAttribute("stroke-width", 2);
+    svg.appendChild(p);
 
-    r.points.forEach(p => {
+    r.points.forEach(pt => {
       const h = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      h.setAttribute("cx", p.x);
-      h.setAttribute("cy", p.y);
+      h.setAttribute("cx", pt.x);
+      h.setAttribute("cy", pt.y);
       h.setAttribute("r", 6);
       h.setAttribute("fill", "#fff");
       h.setAttribute("stroke", "#000");
+
       h.onpointerdown = e => {
         e.stopPropagation();
         const move = ev => {
           const np = svgPoint(ev);
-          p.x = np.x;
-          p.y = np.y;
+          pt.x = np.x;
+          pt.y = np.y;
           redraw();
         };
         window.addEventListener("pointermove", move);
-        window.addEventListener("pointerup", () => {
-          window.removeEventListener("pointermove", move);
-        }, { once: true });
+        window.addEventListener(
+          "pointerup",
+          () => window.removeEventListener("pointermove", move),
+          { once: true }
+        );
       };
+
       svg.appendChild(h);
     });
   }
