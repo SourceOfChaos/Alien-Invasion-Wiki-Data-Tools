@@ -17,6 +17,7 @@ let imgEl = null;
 let bitmap = null;
 let rois = [];
 let mode = null;
+let startPt = null;
 
 /* Radius state */
 let radiusState = "NONE"; // NONE | CENTER_SET | EDITING | CONFIRMED
@@ -25,9 +26,6 @@ let dragging = null;
 let radiusPx = null;
 let radiusGame = null;
 let unitPerPx = null;
-
-/* Drag helpers */
-let lastDragDist = null;
 
 /* ---------------- Helpers ---------------- */
 
@@ -67,8 +65,6 @@ imageInput.addEventListener("change", e => {
       imgEl.setAttribute("height", bitmap.height);
 
       svg.setAttribute("viewBox", `0 0 ${bitmap.width} ${bitmap.height}`);
-      svg.setAttribute("width", bitmap.width);
-      svg.setAttribute("height", bitmap.height);
       svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
       redraw();
@@ -99,7 +95,6 @@ radiusBtn.onclick = () => {
 
     radiusState = "CONFIRMED";
     radiusBtn.textContent = "Fangradius gesetzt";
-    svg.style.touchAction = "auto";
     redraw();
   }
 };
@@ -116,62 +111,90 @@ svg.addEventListener("pointerdown", e => {
       name: "Radius",
       cx: pt.x,
       cy: pt.y,
-      r: 40
+      r: 60
     };
     rois = [radiusROI];
     radiusState = "EDITING";
     radiusBtn.textContent = "Fangradius bestätigen";
-    svg.style.touchAction = "none";
     redraw();
     return;
   }
 
   if (radiusState === "EDITING") {
-    const dCenter = Math.hypot(pt.x - radiusROI.cx, pt.y - radiusROI.cy);
+    const d = Math.hypot(pt.x - radiusROI.cx, pt.y - radiusROI.cy);
 
-    if (dCenter < 12) {
-      dragging = "center";
-    } else if (Math.abs(dCenter - radiusROI.r) < 12) {
+    // größere Hitboxen + Priorität: Rand zuerst
+    if (Math.abs(d - radiusROI.r) < 25) {
       dragging = "edge";
-      lastDragDist = dCenter;
-    } else {
       return;
     }
+    if (d < 30) {
+      dragging = "center";
+      return;
+    }
+  }
 
-    svg.setPointerCapture(e.pointerId);
+  if (mode === "rect" && radiusState === "CONFIRMED") {
+    startPt = pt;
   }
 });
 
 svg.addEventListener("pointermove", e => {
-  if (!dragging || radiusState !== "EDITING") return;
   const pt = svgPoint(e);
 
-  if (dragging === "center") {
-    radiusROI.cx = pt.x;
-    radiusROI.cy = pt.y;
-  }
-
-  if (dragging === "edge") {
-    const d = Math.hypot(pt.x - radiusROI.cx, pt.y - radiusROI.cy);
-    const delta = d - lastDragDist;
-
-    if (Math.abs(delta) > 1) {
-      radiusROI.r = Math.max(10, radiusROI.r + delta);
-      lastDragDist = d;
+  if (dragging && radiusState === "EDITING") {
+    if (dragging === "center") {
+      radiusROI.cx = pt.x;
+      radiusROI.cy = pt.y;
     }
+    if (dragging === "edge") {
+      radiusROI.r = Math.max(
+        10,
+        Math.hypot(pt.x - radiusROI.cx, pt.y - radiusROI.cy)
+      );
+    }
+    redraw();
+    return;
   }
 
-  redraw();
+  if (mode === "rect" && startPt) {
+    const w = pt.x - startPt.x;
+    const h = pt.y - startPt.y;
+    const preview = {
+      type: "rect",
+      name: "_preview",
+      x: Math.min(startPt.x, pt.x),
+      y: Math.min(startPt.y, pt.y),
+      w: Math.abs(w),
+      h: Math.abs(h)
+    };
+    redraw();
+    drawROI(preview);
+  }
 });
 
 svg.addEventListener("pointerup", e => {
   if (dragging) {
-    try {
-      svg.releasePointerCapture(e.pointerId);
-    } catch {}
+    dragging = null;
+    return;
   }
-  dragging = null;
-  lastDragDist = null;
+
+  if (mode === "rect" && startPt) {
+    const end = svgPoint(e);
+    const name = prompt("ROI Name?");
+    if (name) {
+      rois.push({
+        type: "rect",
+        name,
+        x: Math.min(startPt.x, end.x),
+        y: Math.min(startPt.y, end.y),
+        w: Math.abs(end.x - startPt.x),
+        h: Math.abs(end.y - startPt.y)
+      });
+    }
+    startPt = null;
+    redraw();
+  }
 });
 
 /* ---------------- ROI Buttons ---------------- */
@@ -185,23 +208,33 @@ rectBtn.onclick = () => {
 };
 
 polyBtn.onclick = () => {
-  if (radiusState !== "CONFIRMED") {
-    alert("Zuerst Fangradius bestätigen!");
-    return;
-  }
-  alert("Polygon kommt als nächster Schritt – bewusst nicht jetzt.");
+  alert("Polygon folgt als nächster Schritt.");
 };
 
 exportBtn.onclick = () => {
   if (radiusState !== "CONFIRMED") return;
 
-  const out = rois.map(r => ({
-    name: r.name,
-    type: r.type,
-    cx: r.cx * unitPerPx,
-    cy: r.cy * unitPerPx,
-    r: r.r * unitPerPx
-  }));
+  const out = rois.map(r => {
+    if (r.type === "circle") {
+      return {
+        name: r.name,
+        type: "circle",
+        cx: r.cx * unitPerPx,
+        cy: r.cy * unitPerPx,
+        r: r.r * unitPerPx
+      };
+    }
+    if (r.type === "rect") {
+      return {
+        name: r.name,
+        type: "rectangle",
+        x: r.x * unitPerPx,
+        y: r.y * unitPerPx,
+        w: r.w * unitPerPx,
+        h: r.h * unitPerPx
+      };
+    }
+  });
 
   const blob = new Blob([JSON.stringify(out, null, 2)], {
     type: "application/json"
@@ -215,21 +248,33 @@ exportBtn.onclick = () => {
 /* ---------------- Drawing ---------------- */
 
 function drawROI(r) {
-  if (r.type !== "circle") return;
+  if (r.type === "circle") {
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", r.cx);
+    c.setAttribute("cy", r.cy);
+    c.setAttribute("r", r.r);
+    c.setAttribute("fill", "rgba(255,255,0,0.2)");
+    c.setAttribute("stroke", "#ff0");
+    c.setAttribute("stroke-width", 4);
+    svg.appendChild(c);
 
-  const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  c.setAttribute("cx", r.cx);
-  c.setAttribute("cy", r.cy);
-  c.setAttribute("r", r.r);
-  c.setAttribute("fill", "rgba(255,255,0,0.2)");
-  c.setAttribute("stroke", "#ff0");
-  c.setAttribute("stroke-width", 4);
-  svg.appendChild(c);
+    const center = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    center.setAttribute("cx", r.cx);
+    center.setAttribute("cy", r.cy);
+    center.setAttribute("r", 8);
+    center.setAttribute("fill", "#ff0");
+    svg.appendChild(center);
+  }
 
-  const center = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  center.setAttribute("cx", r.cx);
-  center.setAttribute("cy", r.cy);
-  center.setAttribute("r", 6);
-  center.setAttribute("fill", "#ff0");
-  svg.appendChild(center);
+  if (r.type === "rect") {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    el.setAttribute("x", r.x);
+    el.setAttribute("y", r.y);
+    el.setAttribute("width", r.w);
+    el.setAttribute("height", r.h);
+    el.setAttribute("fill", "rgba(0,200,255,0.25)");
+    el.setAttribute("stroke", "#0cf");
+    el.setAttribute("stroke-width", 2);
+    svg.appendChild(el);
+  }
 }
