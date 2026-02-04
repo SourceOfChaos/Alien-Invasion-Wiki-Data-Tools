@@ -1,160 +1,296 @@
 const svg = document.getElementById("svg");
 const imageInput = document.getElementById("imageInput");
-const radiusInput = document.getElementById("radiusInput");
+const rectBtn = document.getElementById("rectBtn");
+const polyBtn = document.getElementById("polyBtn");
+const exportBtn = document.getElementById("exportBtn");
 
-let svgImage = null;
+let imgEl = null;
+let bitmap = null;
 
-const state = {
-  mode: "idle", // idle | set-radius | radius-confirmed
-  radiusUnit: null,
-  radiusPx: null,
-  pxPerUnit: null,
-  center: null,
-  circle: null,
-  handle: null,
-  dragging: false
-};
+let rois = [];
+let mode = null;
+let startPt = null;
+let drawingPoly = null;
 
-/* ---------------- IMAGE LOAD ---------------- */
+/* Radius reference */
+let radiusPx = null;
+let radiusGame = null;
+let unitPerPx = null;
+
+/* ---------------- Helpers ---------------- */
+
+function svgPoint(evt) {
+  const rect = svg.getBoundingClientRect();
+  const e = evt.touches ? evt.touches[0] : evt;
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+}
+
+function clearSVG() {
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+}
+
+function redraw() {
+  clearSVG();
+  if (imgEl) svg.appendChild(imgEl);
+  rois.forEach(drawROI);
+}
+
+/* ---------------- Image Load (FIXED) ---------------- */
 
 imageInput.addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = ev => loadImage(ev.target.result);
+  reader.onload = () => {
+    bitmap = new Image();
+    bitmap.onload = () => {
+      imgEl = document.createElementNS("http://www.w3.org/2000/svg", "image");
+      imgEl.setAttribute("href", reader.result);
+      imgEl.setAttribute("x", 0);
+      imgEl.setAttribute("y", 0);
+      imgEl.setAttribute("width", bitmap.width);
+      imgEl.setAttribute("height", bitmap.height);
+
+      svg.setAttribute("viewBox", `0 0 ${bitmap.width} ${bitmap.height}`);
+      svg.setAttribute("width", bitmap.width);
+      svg.setAttribute("height", bitmap.height);
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+      redraw();
+    };
+    bitmap.src = reader.result;
+  };
   reader.readAsDataURL(file);
 });
 
-function loadImage(src) {
-  svg.innerHTML = "";
+/* ---------------- Interaction ---------------- */
 
-  svgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-  svgImage.setAttributeNS(null, "href", src);
-  svgImage.setAttribute("x", 0);
-  svgImage.setAttribute("y", 0);
+svg.addEventListener("pointerdown", e => {
+  if (!imgEl) return;
+  startPt = svgPoint(e);
 
-  svgImage.onload = () => {
-    const w = svgImage.width.baseVal.value;
-    const h = svgImage.height.baseVal.value;
-    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-  };
+  if (mode === "poly" && drawingPoly) {
+    drawingPoly.points.push(startPt);
+    redraw();
+    startPt = null;
+  }
+});
 
-  svg.appendChild(svgImage);
-}
+svg.addEventListener("pointerup", e => {
+  if (!startPt || !imgEl) return;
+  const end = svgPoint(e);
 
-/* ---------------- RADIUS SETUP ---------------- */
-
-document.getElementById("rectBtn").disabled = true;
-document.getElementById("polyBtn").disabled = true;
-
-document.getElementById("exportBtn").disabled = true;
-
-const confirmBtn = document.createElement("button");
-confirmBtn.textContent = "Radius bestätigen";
-confirmBtn.disabled = true;
-confirmBtn.style.marginLeft = "10px";
-document.querySelector("header").appendChild(confirmBtn);
-
-confirmBtn.onclick = confirmRadius;
-
-svg.addEventListener("pointerdown", onPointerDown);
-svg.addEventListener("pointermove", onPointerMove);
-svg.addEventListener("pointerup", () => state.dragging = false);
-
-/* ---------------- POINTER LOGIC ---------------- */
-
-function onPointerDown(e) {
-  if (!svgImage) return;
-
-  if (state.mode === "idle") {
-    state.mode = "set-radius";
-    state.radiusUnit = Number(radiusInput.value);
-    if (!state.radiusUnit || state.radiusUnit <= 0) {
-      alert("Bitte zuerst Fangradius (Zahl) eingeben.");
-      state.mode = "idle";
+  /* ----- Radius first ----- */
+  if (!radiusPx) {
+    const r = Math.hypot(end.x - startPt.x, end.y - startPt.y);
+    if (r < 10) {
+      startPt = null;
       return;
     }
-    createRadius(e);
-    confirmBtn.disabled = false;
+
+    const gameR = Number(prompt("Fangradius im Spiel (Einheiten)?"));
+    if (!gameR || gameR <= 0) {
+      startPt = null;
+      return;
+    }
+
+    radiusPx = r;
+    radiusGame = gameR;
+    unitPerPx = radiusGame / radiusPx;
+
+    rois.push({
+      type: "circle",
+      name: "Radius",
+      cx: startPt.x,
+      cy: startPt.y,
+      r
+    });
+
+    startPt = null;
+    redraw();
     return;
   }
 
-  if (state.mode === "set-radius" && e.target === state.handle) {
-    state.dragging = true;
+  /* ----- Rectangle ----- */
+  if (mode === "rect") {
+    const name = prompt("ROI Name?");
+    if (!name) {
+      startPt = null;
+      return;
+    }
+
+    rois.push({
+      type: "rect",
+      name,
+      x: Math.min(startPt.x, end.x),
+      y: Math.min(startPt.y, end.y),
+      w: Math.abs(end.x - startPt.x),
+      h: Math.abs(end.y - startPt.y)
+    });
+
+    startPt = null;
+    redraw();
   }
-}
+});
 
-function onPointerMove(e) {
-  if (!state.dragging) return;
-  updateRadius(e);
-}
+/* Finish polygon with double click */
+svg.addEventListener("dblclick", () => {
+  if (drawingPoly && drawingPoly.points.length >= 3) {
+    drawingPoly = null;
+    redraw();
+  }
+});
 
-/* ---------------- RADIUS SVG ---------------- */
+/* ---------------- Buttons ---------------- */
 
-function createRadius(e) {
-  const p = getSVGPoint(e);
-  state.center = p;
+rectBtn.onclick = () => {
+  if (!unitPerPx) {
+    alert("Zuerst Fangradius setzen!");
+    return;
+  }
+  mode = "rect";
+};
 
-  state.circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  state.circle.setAttribute("cx", p.x);
-  state.circle.setAttribute("cy", p.y);
-  state.circle.setAttribute("r", 10);
-  state.circle.setAttribute("fill", "rgba(150,150,150,0.25)");
-  state.circle.setAttribute("stroke", "#999");
-  state.circle.setAttribute("stroke-width", 2);
+polyBtn.onclick = () => {
+  if (!unitPerPx) {
+    alert("Zuerst Fangradius setzen!");
+    return;
+  }
+  const name = prompt("ROI Name?");
+  if (!name) return;
 
-  state.handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  state.handle.setAttribute("r", 8);
-  state.handle.setAttribute("fill", "#000");
+  drawingPoly = {
+    type: "poly",
+    name,
+    points: []
+  };
+  rois.push(drawingPoly);
+  mode = "poly";
+};
 
-  svg.appendChild(state.circle);
-  svg.appendChild(state.handle);
+exportBtn.onclick = () => {
+  if (!unitPerPx) return;
 
-  updateRadius(e);
-}
+  const out = rois.map(r => {
+    if (r.type === "circle") {
+      return {
+        name: r.name,
+        type: "circle",
+        bounds: {
+          x: r.cx * unitPerPx,
+          y: r.cy * unitPerPx,
+          r: r.r * unitPerPx
+        }
+      };
+    }
 
-function updateRadius(e) {
-  const p = getSVGPoint(e);
-  const dx = p.x - state.center.x;
-  const dy = p.y - state.center.y;
-  const r = Math.hypot(dx, dy);
+    if (r.type === "rect") {
+      return {
+        name: r.name,
+        type: "rectangle",
+        x: r.x * unitPerPx,
+        y: r.y * unitPerPx,
+        w: r.w * unitPerPx,
+        h: r.h * unitPerPx
+      };
+    }
 
-  state.radiusPx = r;
+    if (r.type === "poly") {
+      const xs = r.points.map(p => p.x);
+      const ys = r.points.map(p => p.y);
 
-  state.circle.setAttribute("r", r);
-  state.handle.setAttribute("cx", state.center.x + r);
-  state.handle.setAttribute("cy", state.center.y);
-}
+      return {
+        name: r.name,
+        type: "polygon",
+        bounds: {
+          x: Math.min(...xs) * unitPerPx,
+          y: Math.min(...ys) * unitPerPx,
+          w: (Math.max(...xs) - Math.min(...xs)) * unitPerPx,
+          h: (Math.max(...ys) - Math.min(...ys)) * unitPerPx
+        },
+        points: r.points.map(p => ({
+          x: p.x * unitPerPx,
+          y: p.y * unitPerPx
+        }))
+      };
+    }
+  });
 
-/* ---------------- CONFIRM ---------------- */
+  const blob = new Blob([JSON.stringify(out, null, 2)], {
+    type: "application/json"
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "roi-export.json";
+  a.click();
+};
 
-function confirmRadius() {
-  if (!state.radiusPx || !state.radiusUnit) return;
+/* ---------------- Drawing ---------------- */
 
-  state.mode = "radius-confirmed";
-  state.pxPerUnit = state.radiusPx / state.radiusUnit;
+function drawROI(r) {
+  if (r.type === "circle") {
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", r.cx);
+    c.setAttribute("cy", r.cy);
+    c.setAttribute("r", r.r);
+    c.setAttribute("fill", "rgba(180,180,180,0.2)");
+    c.setAttribute("stroke", "#aaa");
+    c.setAttribute("stroke-width", 2);
+    svg.appendChild(c);
+  }
 
-  state.circle.setAttribute("stroke", "#00c853");
-  state.circle.setAttribute("fill", "rgba(0,200,83,0.2)");
+  if (r.type === "rect") {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    el.setAttribute("x", r.x);
+    el.setAttribute("y", r.y);
+    el.setAttribute("width", r.w);
+    el.setAttribute("height", r.h);
+    el.setAttribute("fill", "rgba(0,200,255,0.25)");
+    el.setAttribute("stroke", "#0cf");
+    el.setAttribute("stroke-width", 2);
+    svg.appendChild(el);
+  }
 
-  document.getElementById("rectBtn").disabled = false;
-  document.getElementById("polyBtn").disabled = false;
-  document.getElementById("exportBtn").disabled = false;
+  if (r.type === "poly") {
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    p.setAttribute(
+      "points",
+      r.points.map(pt => `${pt.x},${pt.y}`).join(" ")
+    );
+    p.setAttribute("fill", "rgba(255,200,0,0.25)");
+    p.setAttribute("stroke", "#fc0");
+    p.setAttribute("stroke-width", 2);
+    svg.appendChild(p);
 
-  confirmBtn.disabled = true;
+    r.points.forEach(pt => {
+      const h = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      h.setAttribute("cx", pt.x);
+      h.setAttribute("cy", pt.y);
+      h.setAttribute("r", 6);
+      h.setAttribute("fill", "#fff");
+      h.setAttribute("stroke", "#000");
 
-  console.log("Radius bestätigt:");
-  console.log("Pixel:", state.radiusPx);
-  console.log("Einheiten:", state.radiusUnit);
-  console.log("px / Einheit:", state.pxPerUnit);
-}
+      h.onpointerdown = e => {
+        e.stopPropagation();
+        const move = ev => {
+          const np = svgPoint(ev);
+          pt.x = np.x;
+          pt.y = np.y;
+          redraw();
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener(
+          "pointerup",
+          () => window.removeEventListener("pointermove", move),
+          { once: true }
+        );
+      };
 
-/* ---------------- HELPERS ---------------- */
-
-function getSVGPoint(evt) {
-  const pt = svg.createSVGPoint();
-  pt.x = evt.clientX;
-  pt.y = evt.clientY;
-  return pt.matrixTransform(svg.getScreenCTM().inverse());
+      svg.appendChild(h);
+    });
+  }
 }
