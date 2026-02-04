@@ -31,10 +31,15 @@ let unitPerPx = null;
 function svgPoint(evt) {
   const rect = svg.getBoundingClientRect();
   const e = evt.touches ? evt.touches[0] : evt;
-  return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top
-  };
+
+  // Berechne Position innerhalb des SVG viewBox
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  const ctm = svg.getScreenCTM().inverse();
+  const svgPt = pt.matrixTransform(ctm);
+
+  return { x: svgPt.x, y: svgPt.y };
 }
 
 function clearSVG() {
