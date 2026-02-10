@@ -1,17 +1,43 @@
 body {
   margin: 0;
   font-family: sans-serif;
+  background: #111;
+  color: #fff;
 }
 
 header {
   padding: 8px;
   background: #222;
-  color: #fff;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#roiList {
+  background: #111;
+  padding: 6px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #333;
+}
+
+.roi-item {
+  padding: 4px 8px;
+  border: 1px solid #555;
+  opacity: 0.5;
+  cursor: pointer;
+  user-select: none;
+}
+
+.roi-item.active {
+  border-color: #f00;
+  opacity: 1;
 }
 
 #workspace {
   width: 100vw;
-  height: calc(100vh - 50px);
+  height: calc(100vh - 110px);
   overflow: hidden;
 }
 
@@ -19,5 +45,5 @@ svg {
   width: 100%;
   height: 100%;
   background: #111;
-  touch-action: none; /* verhindert Scroll / Zoom auf iOS */
+  touch-action: pan-x pan-y pinch-zoom;
 }
