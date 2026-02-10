@@ -17,7 +17,7 @@ let unitPerPx = null;
 
 /* Radius */
 let radiusState = "NONE"; // NONE | EDIT | CONFIRMED
-let dragging = null;
+let dragging = null; // { type, corner }
 
 /* ---------------- Helpers ---------------- */
 
@@ -79,7 +79,7 @@ imageInput.addEventListener("change", e => {
   reader.readAsDataURL(file);
 });
 
-/* ---------------- Fangradius ---------------- */
+/* ---------------- Fangradius (unangetastet) ---------------- */
 
 radiusBtn.onclick = () => {
   if (!imgEl) return;
@@ -131,15 +131,23 @@ rectBtn.onclick = () => {
     h: size
   };
 
-  initRectHandles(r);
   rois.push(r);
   activeROI = r;
-
   redraw();
   refreshROIList();
 };
 
 /* ---------------- Interaction ---------------- */
+
+function startDrag(info) {
+  dragging = info;
+  svg.style.touchAction = "none";
+}
+
+function stopDrag() {
+  dragging = null;
+  svg.style.touchAction = "pan-x pan-y pinch-zoom";
+}
 
 svg.addEventListener("pointerdown", e => {
   if (!activeROI) return;
@@ -148,17 +156,16 @@ svg.addEventListener("pointerdown", e => {
 
   if (activeROI.type === "circle") {
     const d = Math.hypot(pt.x - activeROI.cx, pt.y - activeROI.cy);
-    if (Math.abs(d - activeROI.r) < 20) dragging = "radius";
-    else if (d < 20) dragging = "center";
-    if (dragging) svg.style.touchAction = "none";
+    if (Math.abs(d - activeROI.r) < 22) startDrag({ type: "circle-radius" });
+    else if (d < 22) startDrag({ type: "circle-center" });
     return;
   }
 
   if (activeROI.type === "rect") {
-    for (const h of activeROI.handles) {
-      if (Math.hypot(pt.x - h.x, pt.y - h.y) < 20) {
-        dragging = h;
-        svg.style.touchAction = "none";
+    const corners = getRectCorners(activeROI);
+    for (const c of corners) {
+      if (Math.hypot(pt.x - c.x, pt.y - c.y) < 22) {
+        startDrag({ type: "rect", corner: c.id });
         return;
       }
     }
@@ -169,51 +176,67 @@ svg.addEventListener("pointermove", e => {
   if (!dragging || !activeROI) return;
   const pt = svgPoint(e);
 
-  if (activeROI.type === "circle") {
-    if (dragging === "center") {
-      activeROI.cx = pt.x;
-      activeROI.cy = pt.y;
-    }
-    if (dragging === "radius") {
-      activeROI.r = Math.max(
-        10,
-        Math.hypot(pt.x - activeROI.cx, pt.y - activeROI.cy)
-      );
-    }
+  if (dragging.type === "circle-center") {
+    activeROI.cx = pt.x;
+    activeROI.cy = pt.y;
   }
 
-  if (activeROI.type === "rect") {
-    dragging.x = pt.x;
-    dragging.y = pt.y;
-    updateRectFromHandles(activeROI);
+  if (dragging.type === "circle-radius") {
+    activeROI.r = Math.max(
+      10,
+      Math.hypot(pt.x - activeROI.cx, pt.y - activeROI.cy)
+    );
+  }
+
+  if (dragging.type === "rect") {
+    resizeRectFromCorner(activeROI, dragging.corner, pt);
   }
 
   redraw();
 });
 
-svg.addEventListener("pointerup", () => {
-  dragging = null;
-  svg.style.touchAction = "pan-x pan-y pinch-zoom";
-});
+svg.addEventListener("pointerup", stopDrag);
+svg.addEventListener("pointercancel", stopDrag);
+svg.addEventListener("pointerleave", stopDrag);
 
-/* ---------------- Rect helpers ---------------- */
+/* ---------------- Rect math ---------------- */
 
-function initRectHandles(r) {
-  r.handles = [
-    { x: r.x, y: r.y },
-    { x: r.x + r.w, y: r.y },
-    { x: r.x + r.w, y: r.y + r.h },
-    { x: r.x, y: r.y + r.h }
+function getRectCorners(r) {
+  return [
+    { id: "nw", x: r.x, y: r.y },
+    { id: "ne", x: r.x + r.w, y: r.y },
+    { id: "se", x: r.x + r.w, y: r.y + r.h },
+    { id: "sw", x: r.x, y: r.y + r.h }
   ];
 }
 
-function updateRectFromHandles(r) {
-  const xs = r.handles.map(h => h.x);
-  const ys = r.handles.map(h => h.y);
-  r.x = Math.min(...xs);
-  r.y = Math.min(...ys);
-  r.w = Math.max(...xs) - r.x;
-  r.h = Math.max(...ys) - r.y;
+function resizeRectFromCorner(r, corner, pt) {
+  const x2 = r.x + r.w;
+  const y2 = r.y + r.h;
+
+  if (corner === "nw") {
+    r.w = x2 - pt.x;
+    r.h = y2 - pt.y;
+    r.x = pt.x;
+    r.y = pt.y;
+  }
+  if (corner === "ne") {
+    r.w = pt.x - r.x;
+    r.h = y2 - pt.y;
+    r.y = pt.y;
+  }
+  if (corner === "se") {
+    r.w = pt.x - r.x;
+    r.h = pt.y - r.y;
+  }
+  if (corner === "sw") {
+    r.w = x2 - pt.x;
+    r.h = pt.y - r.y;
+    r.x = pt.x;
+  }
+
+  r.w = Math.max(10, r.w);
+  r.h = Math.max(10, r.h);
 }
 
 /* ---------------- Drawing ---------------- */
@@ -221,13 +244,8 @@ function updateRectFromHandles(r) {
 function drawROI(r) {
   const active = r === activeROI;
 
-  if (r.type === "circle") {
-    drawCircle(r, active);
-  }
-
-  if (r.type === "rect") {
-    drawRect(r, active);
-  }
+  if (r.type === "circle") drawCircle(r, active);
+  if (r.type === "rect") drawRect(r, active);
 }
 
 function drawCircle(r, active) {
@@ -258,15 +276,24 @@ function drawRect(r, active) {
   svg.appendChild(el);
 
   if (active) {
-    r.handles.forEach(h => drawHandle(h.x, h.y));
+    getRectCorners(r).forEach(c => drawHandle(c.x, c.y));
   }
 }
 
 function drawHandle(x, y) {
-  const h = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  h.setAttribute("cx", x);
-  h.setAttribute("cy", y);
-  h.setAttribute("r", 8);
-  h.setAttribute("fill", "#fff");
-  svg.appendChild(h);
+  // große unsichtbare Hitbox
+  const hit = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  hit.setAttribute("cx", x);
+  hit.setAttribute("cy", y);
+  hit.setAttribute("r", 22);
+  hit.setAttribute("fill", "transparent");
+  svg.appendChild(hit);
+
+  // sichtbarer Punkt
+  const vis = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  vis.setAttribute("cx", x);
+  vis.setAttribute("cy", y);
+  vis.setAttribute("r", 6);
+  vis.setAttribute("fill", "#fff");
+  svg.appendChild(vis);
 }
