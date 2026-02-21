@@ -135,14 +135,14 @@ display: none;
 position: fixed;
 inset: 0;
 z-index: 50;
-background: #000c;
+background: #000000c;
 align-items: flex-start;
 justify-content: flex-start;
 padding-top: 110px; /* below header+toolbar+status */
 }
 #roi-panel.open { display: flex; }
 #roi-panel-inner {
-background: var(–surf);
+background: #1c2030;
 border: 1px solid var(–border);
 border-radius: 0 0 8px 8px;
 width: 100%;
@@ -1043,9 +1043,12 @@ function syncRoiSvg(roi) {
     const poly = roi.svgG.querySelector('polygon');
     if (poly) poly.setAttribute('points', roi.geo.points.map(p => `${p.x},${p.y}`).join(' '));
     // sync vertex handles
-    roi.geo.points.forEach((p, i) => {
-      const h = lHandles.querySelector(`[data-htype="pv"][data-hroiIdx="${i}"][data-hroi="${roi.id}"]`);
-      if (h) { h.setAttribute('cx', p.x); h.setAttribute('cy', p.y); }
+    const allHandles = lHandles.querySelectorAll(`[data-htype="pv"][data-hroi="${roi.id}"]`);
+    allHandles.forEach((h, i) => {
+      if (roi.geo.points[i]) {
+        h.setAttribute('cx', roi.geo.points[i].x);
+        h.setAttribute('cy', roi.geo.points[i].y);
+      }
     });
   }
 }
