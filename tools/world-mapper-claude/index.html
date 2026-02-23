@@ -6,21 +6,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>WorldMapper</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@300;400;500;600&display=swap');
 
 :root {
-–bg: #0d0f14;
-–surface: #141720;
-–surface2: #1c2030;
-–border: #2a3048;
-–accent: #e8ff47;
-–accent2: #47ffe8;
-–danger: #ff4757;
-–text: #c8d0e8;
-–text-dim: #5a6280;
-–roi-active: #e8ff47;
-–roi-inactive: #47ffe840;
-–calib: #47ffe8;
+–bg:       #0d0f14;
+–surf:     #141720;
+–surf2:    #1c2030;
+–border:   #2a3048;
+–accent:   #e8ff47;
+–cyan:     #47ffe8;
+–danger:   #ff4757;
+–text:     #c8d0e8;
+–dim:      #5a6280;
+–handle-r: 14px; /* handle touch radius */
 }
 
 - { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -34,1614 +32,1199 @@ display: flex;
 flex-direction: column;
 overflow: hidden;
 user-select: none;
+-webkit-user-select: none;
 }
 
-/* ── HEADER ── */
+/* ── HEADER ─────────────────────────────── */
 header {
 display: flex;
 align-items: center;
 justify-content: space-between;
-padding: 10px 14px;
-background: var(–surface);
+padding: 8px 12px;
+background: var(–surf);
 border-bottom: 1px solid var(–border);
-gap: 8px;
 flex-shrink: 0;
+gap: 8px;
 z-index: 10;
 }
-
 .logo {
 font-family: ‘Share Tech Mono’, monospace;
-font-size: 13px;
+font-size: 12px;
 color: var(–accent);
 letter-spacing: 2px;
-white-space: nowrap;
 }
+.hdr-btns { display: flex; gap: 6px; }
 
-.header-actions {
-display: flex;
-gap: 6px;
-align-items: center;
-}
-
-.btn {
-font-family: ‘Share Tech Mono’, monospace;
-font-size: 11px;
-letter-spacing: 1px;
-padding: 7px 12px;
-border: 1px solid var(–border);
-background: var(–surface2);
-color: var(–text);
-border-radius: 4px;
-cursor: pointer;
-transition: all 0.15s;
-white-space: nowrap;
-}
-.btn:active { transform: scale(0.96); }
-.btn.accent { background: var(–accent); color: #0d0f14; border-color: var(–accent); font-weight: 600; }
-.btn.calib { border-color: var(–calib); color: var(–calib); }
-.btn.danger { border-color: var(–danger); color: var(–danger); }
-.btn.sm { padding: 5px 8px; font-size: 10px; }
-
-/* ── TOOLBAR ── */
+/* ── TOOLBAR ─────────────────────────────── */
 .toolbar {
 display: flex;
 align-items: center;
-gap: 6px;
-padding: 8px 14px;
-background: var(–surface);
+gap: 5px;
+padding: 6px 12px;
+background: var(–surf);
 border-bottom: 1px solid var(–border);
 flex-shrink: 0;
 overflow-x: auto;
 scrollbar-width: none;
 }
 .toolbar::-webkit-scrollbar { display: none; }
+.tsep { width: 1px; height: 18px; background: var(–border); flex-shrink: 0; }
 
-.tool-btn {
+/* ── BUTTONS ─────────────────────────────── */
+.btn {
 font-family: ‘Share Tech Mono’, monospace;
 font-size: 10px;
 letter-spacing: 1px;
 padding: 6px 10px;
 border: 1px solid var(–border);
-background: var(–surface2);
-color: var(–text-dim);
+background: var(–surf2);
+color: var(–text);
 border-radius: 4px;
 cursor: pointer;
-transition: all 0.15s;
 white-space: nowrap;
 flex-shrink: 0;
+transition: opacity .1s;
 }
-.tool-btn.active {
-background: var(–accent);
-color: #0d0f14;
-border-color: var(–accent);
-color: #0d0f14;
-}
-.tool-btn.calib-btn.active {
-background: var(–calib);
-border-color: var(–calib);
-color: #0d0f14;
-}
-.tool-sep { width: 1px; height: 20px; background: var(–border); flex-shrink: 0; }
+.btn:active { opacity: .7; }
+.btn.on    { background: var(–accent); color: #0d0f14; border-color: var(–accent); }
+.btn.cyan  { border-color: var(–cyan); color: var(–cyan); }
+.btn.cyan.on { background: var(–cyan); color: #0d0f14; }
+.btn.red   { border-color: var(–danger); color: var(–danger); }
+.btn.file  { border-color: var(–cyan); color: var(–cyan); }
+.btn.exp   { border-color: var(–accent); color: var(–accent); }
+.btn[disabled] { opacity: .3; pointer-events: none; }
 
-/* ── STATUS BAR ── */
-.status-bar {
-display: flex;
-align-items: center;
-gap: 12px;
-padding: 5px 14px;
+/* ── STATUS ──────────────────────────────── */
+.statusbar {
+display: flex; gap: 10px;
+padding: 4px 12px;
 background: var(–bg);
 border-bottom: 1px solid var(–border);
 flex-shrink: 0;
 overflow-x: auto;
 scrollbar-width: none;
 }
-.status-bar::-webkit-scrollbar { display: none; }
-.status-chip {
+.statusbar::-webkit-scrollbar { display: none; }
+.chip {
 font-family: ‘Share Tech Mono’, monospace;
 font-size: 10px;
-color: var(–text-dim);
+color: var(–dim);
 white-space: nowrap;
-display: flex;
-align-items: center;
-gap: 4px;
 }
-.status-chip span { color: var(–accent2); }
-.status-chip.warn span { color: var(–danger); }
+.chip b { color: var(–cyan); font-weight: 400; }
+.chip.warn b { color: var(–danger); }
 
-/* ── CANVAS AREA ── */
-#canvas-wrap {
+/* ── CANVAS ──────────────────────────────── */
+#wrap {
 flex: 1;
-overflow: hidden;
 position: relative;
-background: repeating-linear-gradient(
-45deg,
-#0d0f14 0px, #0d0f14 10px,
-#111318 10px, #111318 20px
-);
+overflow: hidden;
+background: #0a0c10;
 touch-action: none;
 }
-
-#svg-root {
+#svg {
 position: absolute;
-top: 0; left: 0;
+inset: 0;
 width: 100%; height: 100%;
 overflow: visible;
 }
 
-/* ── ROI DROPDOWN ── */
-.roi-dropdown-wrap {
-position: absolute;
-bottom: 14px;
-left: 14px;
-right: 14px;
-z-index: 20;
-}
-
-.roi-dropdown-header {
-display: flex;
-align-items: center;
-justify-content: space-between;
-background: var(–surface);
-border: 1px solid var(–border);
-border-radius: 6px;
-padding: 10px 14px;
-cursor: pointer;
-gap: 8px;
-}
-.roi-dropdown-header.open {
-border-bottom-left-radius: 0;
-border-bottom-right-radius: 0;
-border-color: var(–accent);
-}
-
-.roi-dropdown-label {
-font-family: ‘Share Tech Mono’, monospace;
-font-size: 11px;
-color: var(–text-dim);
-letter-spacing: 1px;
-flex-shrink: 0;
-}
-.roi-active-name {
-font-family: ‘Share Tech Mono’, monospace;
-font-size: 12px;
-color: var(–accent);
-flex: 1;
-text-overflow: ellipsis;
-overflow: hidden;
-white-space: nowrap;
-}
-.roi-chevron {
-font-size: 10px;
-color: var(–text-dim);
-transition: transform 0.2s;
-flex-shrink: 0;
-}
-.roi-chevron.open { transform: rotate(180deg); }
-
-.roi-list {
-display: none;
-background: var(–surface);
-border: 1px solid var(–accent);
-border-top: none;
-border-bottom-left-radius: 6px;
-border-bottom-right-radius: 6px;
-max-height: 220px;
-overflow-y: auto;
-scrollbar-width: thin;
-scrollbar-color: var(–border) transparent;
-}
-.roi-list.open { display: block; }
-
-.roi-item {
-display: flex;
-align-items: center;
-padding: 10px 14px;
-gap: 10px;
-border-bottom: 1px solid var(–border);
-cursor: pointer;
-transition: background 0.1s;
-}
-.roi-item:last-child { border-bottom: none; }
-.roi-item:active { background: var(–surface2); }
-.roi-item.active { background: #e8ff4710; }
-
-.roi-dot {
-width: 8px; height: 8px;
-border-radius: 50%;
-flex-shrink: 0;
-}
-.roi-item-name {
-font-family: ‘Share Tech Mono’, monospace;
-font-size: 12px;
-color: var(–text);
-flex: 1;
-text-overflow: ellipsis;
-overflow: hidden;
-white-space: nowrap;
-}
-.roi-item.active .roi-item-name { color: var(–accent); }
-.roi-item-type {
-font-size: 10px;
-color: var(–text-dim);
-font-family: ‘Share Tech Mono’, monospace;
-flex-shrink: 0;
-}
-.roi-del {
-font-size: 14px;
-color: var(–text-dim);
-padding: 2px 4px;
-flex-shrink: 0;
-}
-.roi-del:active { color: var(–danger); }
-
-/* ── MODAL ── */
-.modal-overlay {
+/* ── ROI OVERLAY PANEL ───────────────────── */
+#roi-panel {
 display: none;
 position: fixed;
 inset: 0;
-background: #000a;
-z-index: 100;
-align-items: center;
-justify-content: center;
-padding: 20px;
+z-index: 50;
+background: #000000c;
+align-items: flex-start;
+justify-content: flex-start;
+padding-top: 110px; /* below header+toolbar+status */
 }
-.modal-overlay.open { display: flex; }
+#roi-panel.open { display: flex; }
+#roi-panel-inner {
+background: #1c2030f5;
+border: 1px solid var(–border);
+border-radius: 0 0 8px 8px;
+width: 100%;
+max-height: 55vh;
+overflow-y: auto;
+scrollbar-width: thin;
+}
+.rpitem {
+display: flex; align-items: center; gap: 10px;
+padding: 11px 14px;
+border-bottom: 1px solid var(–border);
+cursor: pointer;
+}
+.rpitem:last-child { border-bottom: none; }
+.rpitem.active { background: #e8ff4710; }
+.rpitem:active { background: var(–surf2); }
+.rpdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.rpname {
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 12px; flex: 1;
+color: var(#ffffff);
+overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rpitem.active .rpname { color: var(–accent); }
+.rptype { font-family: ‘Share Tech Mono’, monospace; font-size: 10px; color: var(–dim); flex-shrink: 0; }
+.rpdel  { font-size: 15px; color: var(–dim); padding: 2px 6px; flex-shrink: 0; }
+.rpempty {
+padding: 16px 14px;
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 11px; color: var(–dim); text-align: center;
+}
 
+/* ── EMPTY STATE ─────────────────────────── */
+#empty {
+position: absolute; inset: 0;
+display: flex; flex-direction: column;
+align-items: center; justify-content: center;
+gap: 10px; pointer-events: none;
+}
+.empty-ico { font-size: 36px; opacity: .25; }
+.empty-txt {
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 11px; color: var(–dim);
+text-align: center; line-height: 1.9; letter-spacing: 1px;
+}
+
+/* ── MODALS ──────────────────────────────── */
+.modal-bg {
+display: none; position: fixed; inset: 0;
+background: #000b; z-index: 200;
+align-items: center; justify-content: center; padding: 20px;
+}
+.modal-bg.open { display: flex; }
 .modal {
-background: var(–surface);
+background: var(–surf);
 border: 1px solid var(–border);
 border-radius: 10px;
-padding: 20px;
-width: 100%;
-max-width: 340px;
+padding: 20px; width: 100%; max-width: 320px;
 }
-
 .modal-title {
 font-family: ‘Share Tech Mono’, monospace;
-font-size: 13px;
-color: var(–accent);
-letter-spacing: 2px;
-margin-bottom: 16px;
+font-size: 12px; color: var(–accent);
+letter-spacing: 2px; margin-bottom: 14px;
 }
-
-.field-group { margin-bottom: 14px; }
-.field-label {
+.flabel {
 font-family: ‘Share Tech Mono’, monospace;
-font-size: 10px;
-color: var(–text-dim);
-letter-spacing: 1px;
-margin-bottom: 5px;
+font-size: 10px; color: var(–dim);
+letter-spacing: 1px; margin-bottom: 5px;
 }
-.field-input {
+.finput {
 width: 100%;
-background: var(–bg);
-border: 1px solid var(–border);
+background: var(–bg); border: 1px solid var(–border);
 color: var(–text);
 font-family: ‘Share Tech Mono’, monospace;
-font-size: 14px;
-padding: 10px 12px;
-border-radius: 4px;
-outline: none;
+font-size: 14px; padding: 9px 11px; border-radius: 4px; outline: none;
 }
-.field-input:focus { border-color: var(–accent2); }
-
-.modal-actions {
-display: flex;
-gap: 8px;
-justify-content: flex-end;
-margin-top: 16px;
-}
-
-/* ── CALIB INFO ── */
-.calib-hint {
-font-size: 11px;
-color: var(–text-dim);
-line-height: 1.5;
-margin-top: 6px;
-}
-
-/* ── EMPTY STATE ── */
-.empty-state {
-position: absolute;
-inset: 0;
-display: flex;
-flex-direction: column;
-align-items: center;
-justify-content: center;
-gap: 12px;
-pointer-events: none;
-}
-.empty-icon { font-size: 40px; opacity: 0.3; }
-.empty-text {
-font-family: ‘Share Tech Mono’, monospace;
-font-size: 12px;
-color: var(–text-dim);
-text-align: center;
-letter-spacing: 1px;
-line-height: 1.8;
-}
-
-/* ── SVG STYLES (inline) ── */
-.roi-polygon-preview {
-fill: none;
-stroke: var(–accent);
-stroke-width: 1.5;
-stroke-dasharray: 6 4;
-pointer-events: none;
-}
-
-/* Polygon point indicator during creation */
-.poly-point-indicator {
-fill: var(–accent);
-stroke: #0d0f14;
-stroke-width: 2;
-pointer-events: none;
-}
+.finput:focus { border-color: var(–cyan); }
+.fhint { font-size: 11px; color: var(–dim); margin-top: 5px; line-height: 1.5; }
+.mbtns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 </style>
 
 </head>
 <body>
 
-<!-- HEADER -->
-
 <header>
   <div class="logo">◈ WORLDMAPPER</div>
-  <div class="header-actions">
-    <button class="btn calib sm" id="btn-load-img">📂 BILD</button>
-    <button class="btn sm" id="btn-export" disabled>⬇ JSON</button>
+  <div class="hdr-btns">
+    <button class="btn file" id="btn-load">📂 BILD</button>
+    <button class="btn exp"  id="btn-export" disabled>⬇ JSON</button>
   </div>
 </header>
 
-<!-- TOOLBAR -->
-
 <div class="toolbar">
-  <button class="tool-btn calib-btn" id="tool-calib" disabled>⊙ KALIBRIERUNG</button>
-  <div class="tool-sep"></div>
-  <button class="tool-btn" id="tool-circle" disabled>○ KREIS</button>
-  <button class="tool-btn" id="tool-polygon" disabled>⬡ POLYGON</button>
-  <div class="tool-sep"></div>
-  <button class="tool-btn" id="tool-select">↖ SELECT</button>
+  <button class="btn cyan" id="btn-calib"   disabled>⊙ KALIB</button>
+  <div class="tsep"></div>
+  <button class="btn" id="btn-circle"  disabled>○ KREIS</button>
+  <button class="btn" id="btn-poly"    disabled>⬡ POLY</button>
+  <button class="btn" id="btn-addpt"   style="display:none">＋ PUNKT</button>
+  <button class="btn" id="btn-closepoly" style="display:none">✓ SCHLIESSEN</button>
+  <div class="tsep"></div>
+  <button class="btn" id="btn-rois">☰ ROIs <span id="roi-count"></span></button>
 </div>
 
-<!-- STATUS BAR -->
-
-<div class="status-bar">
-  <div class="status-chip" id="status-img">IMG <span>—</span></div>
-  <div class="status-chip" id="status-calib">SCALE <span>—</span></div>
-  <div class="status-chip" id="status-coords">XY <span>—</span></div>
-  <div class="status-chip" id="status-mode">MODE <span>SELECT</span></div>
+<div class="statusbar">
+  <div class="chip" id="sc-img">IMG <b>—</b></div>
+  <div class="chip" id="sc-scale">SCALE <b>—</b></div>
+  <div class="chip" id="sc-active">AKTIV <b>—</b></div>
+  <div class="chip" id="sc-mode">MODE <b>WÄHLEN</b></div>
 </div>
 
-<!-- CANVAS -->
-
-<div id="canvas-wrap">
-  <svg id="svg-root" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-        <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#1c2030" stroke-width="0.5"/>
-      </pattern>
-    </defs>
-    <!-- layers -->
-    <g id="layer-bg"></g>
-    <g id="layer-image"></g>
-    <g id="layer-rois"></g>
-    <g id="layer-handles"></g>
-    <g id="layer-poly-preview"></g>
+<div id="wrap">
+  <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+    <g id="l-img"></g>
+    <g id="l-roi"></g>
+    <g id="l-handles"></g>
+    <g id="l-polyprev"></g>
   </svg>
-
-  <div class="empty-state" id="empty-state">
-    <div class="empty-icon">🗺</div>
-    <div class="empty-text">BILD LADEN → KALIBRIEREN<br>→ ROIs SETZEN → EXPORT</div>
+  <div id="empty">
+    <div class="empty-ico">🗺</div>
+    <div class="empty-txt">BILD LADEN<br>→ KALIBRIEREN<br>→ ROIs ERFASSEN<br>→ JSON EXPORT</div>
   </div>
 </div>
 
-<!-- ROI DROPDOWN -->
+<!-- ROI Panel -->
 
-<div class="roi-dropdown-wrap">
-  <div class="roi-dropdown-header" id="roi-dropdown-header">
-    <span class="roi-dropdown-label">ROI</span>
-    <span class="roi-active-name" id="roi-active-label">— kein ROI —</span>
-    <span class="roi-chevron" id="roi-chevron">▼</span>
-  </div>
-  <div class="roi-list" id="roi-list"></div>
+<div id="roi-panel">
+  <div id="roi-panel-inner" id="rpi"></div>
 </div>
 
-<!-- HIDDEN FILE INPUT -->
+<!-- File input -->
 
-<input type="file" id="file-input" accept="image/*" style="display:none">
+<input type="file" id="finput" accept="image/*" style="display:none">
 
-<!-- MODAL: ROI Name -->
+<!-- Modal: Name -->
 
-<div class="modal-overlay" id="modal-name">
+<div class="modal-bg" id="m-name">
   <div class="modal">
-    <div class="modal-title" id="modal-name-title">NEUES ROI</div>
-    <div class="field-group">
-      <div class="field-label">NAME</div>
-      <input class="field-input" id="input-roi-name" type="text" placeholder="z.B. Kustov_Raum" autocomplete="off">
-    </div>
-    <div class="modal-actions">
-      <button class="btn" id="modal-name-cancel">ABBRUCH</button>
-      <button class="btn accent" id="modal-name-ok">ERSTELLEN</button>
+    <div class="modal-title" id="m-name-title">NEUES ROI</div>
+    <div class="flabel">NAME</div>
+    <input class="finput" id="m-name-input" type="text" autocomplete="off" placeholder="z.B. Kustov_Raum">
+    <div class="mbtns">
+      <button class="btn" id="m-name-cancel">ABBRUCH</button>
+      <button class="btn on" id="m-name-ok">OK</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL: Kalibrierung -->
+<!-- Modal: Calib units -->
 
-<div class="modal-overlay" id="modal-calib">
+<div class="modal-bg" id="m-calib">
   <div class="modal">
     <div class="modal-title">KALIBRIERUNG</div>
-    <div class="field-group">
-      <div class="field-label">REALE GRÖSSE IN SPIELEINHEITEN</div>
-      <input class="field-input" id="input-calib-units" type="number" step="0.1" min="0.01" placeholder="z.B. 50">
-      <div class="calib-hint">Kreis-Radius entspricht diesem Wert.<br>Alle ROIs werden danach umgerechnet.</div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" id="modal-calib-cancel">ABBRUCH</button>
-      <button class="btn calib" id="modal-calib-ok">KALIBRIEREN</button>
+    <div class="flabel">RADIUS IN SPIELEINHEITEN</div>
+    <input class="finput" id="m-calib-input" type="number" step="0.01" min="0.001" placeholder="z.B. 50">
+    <div class="fhint">Der Radius des Kalibrierungskreises entspricht diesem Wert.<br>Alle ROIs werden danach umgerechnet.</div>
+    <div class="mbtns">
+      <button class="btn" id="m-calib-cancel">ABBRUCH</button>
+      <button class="btn cyan" id="m-calib-ok">KALIBRIEREN</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL: Rename -->
+<!-- Modal: Rename -->
 
-<div class="modal-overlay" id="modal-rename">
+<div class="modal-bg" id="m-rename">
   <div class="modal">
-    <div class="modal-title">ROI UMBENENNEN</div>
-    <div class="field-group">
-      <div class="field-label">NEUER NAME</div>
-      <input class="field-input" id="input-rename" type="text" autocomplete="off">
-    </div>
-    <div class="modal-actions">
-      <button class="btn" id="modal-rename-cancel">ABBRUCH</button>
-      <button class="btn accent" id="modal-rename-ok">SPEICHERN</button>
+    <div class="modal-title">UMBENENNEN</div>
+    <div class="flabel">NEUER NAME</div>
+    <input class="finput" id="m-rename-input" type="text" autocomplete="off">
+    <div class="mbtns">
+      <button class="btn" id="m-rename-cancel">ABBRUCH</button>
+      <button class="btn on" id="m-rename-ok">SPEICHERN</button>
     </div>
   </div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════
-const state = {
-  image: null,          // { width, height, src }
-  viewBox: { x: 0, y: 0, w: 0, h: 0 },
+'use strict';
+// ════════════════════════════════════════════════
+// CONSTANTS & STATE
+// ════════════════════════════════════════════════
+const NS = 'http://www.w3.org/2000/svg';
+const HANDLE_HIT = 22;   // px hit radius for handles (screen pixels)
+const POLY_CLOSE_HIT = 26; // px screen distance to close polygon on first point
+
+const PALETTE = [
+  '#e8ff47','#ff6b81','#a29bfe','#fd79a8',
+  '#55efc4','#fdcb6e','#74b9ff','#ff7675'
+];
+
+let S = {
+  img: null,          // { w, h, src }
+  vb: { x:0, y:0, w:0, h:0 },
   unitPerPx: null,
-  calibROI: null,       // roi id of calibration circle
-  rois: [],             // { id, name, type, geometry, svgEl, handleEls }
-  activeROI: null,
-  mode: 'select',       // 'select' | 'calib' | 'circle' | 'polygon'
-  polyPoints: [],       // during polygon creation
-  polyPreviewLine: null,
-  drag: null,           // { type, roiId, handleIdx, startX, startY, ... }
-  pan: { active: false, startX: 0, startY: 0, vbStart: null },
-  pinch: null,
-  isDragging: false,    // true while a handle drag is happening
+  calibId: null,
+  rois: [],           // ROI objects
+  activeId: null,
+  mode: 'select',     // select | calib | circle | poly | addpt
+  polyPts: [],        // points during polygon creation
+  polyName: '',
+  drag: null,         // active handle drag
+  pan: null,          // active pan
+  pinchDist: 0,
+  roiPanelOpen: false,
+  addPtMode: false,   // waiting for tap on edge to insert point
+  _roiSeq: 0,
 };
 
-let roiCounter = 0;
-const svgNS = 'http://www.w3.org/2000/svg';
+// ════════════════════════════════════════════════
+// DOM REFS
+// ════════════════════════════════════════════════
+const wrap       = document.getElementById('wrap');
+const svgEl      = document.getElementById('svg');
+const lImg       = document.getElementById('l-img');
+const lRoi       = document.getElementById('l-roi');
+const lHandles   = document.getElementById('l-handles');
+const lPoly      = document.getElementById('l-polyprev');
+const emptyEl    = document.getElementById('empty');
+const roiPanel   = document.getElementById('roi-panel');
+const roiPanelInner = document.getElementById('roi-panel-inner');
+const fileInput  = document.getElementById('finput');
 
-// ─── DOM refs ───
-const canvasWrap = document.getElementById('canvas-wrap');
-const svgRoot = document.getElementById('svg-root');
-const layerBG = document.getElementById('layer-bg');
-const layerImage = document.getElementById('layer-image');
-const layerROIs = document.getElementById('layer-rois');
-const layerHandles = document.getElementById('layer-handles');
-const layerPolyPreview = document.getElementById('layer-poly-preview');
-const emptyState = document.getElementById('empty-state');
+const btnLoad    = document.getElementById('btn-load');
+const btnExport  = document.getElementById('btn-export');
+const btnCalib   = document.getElementById('btn-calib');
+const btnCircle  = document.getElementById('btn-circle');
+const btnPoly    = document.getElementById('btn-poly');
+const btnAddPt   = document.getElementById('btn-addpt');
+const btnClosePoly = document.getElementById('btn-closepoly');
+const btnRois    = document.getElementById('btn-rois');
+const roiCount   = document.getElementById('roi-count');
 
-const fileInput = document.getElementById('file-input');
-const btnLoadImg = document.getElementById('btn-load-img');
-const btnExport = document.getElementById('btn-export');
+const scImg    = document.getElementById('sc-img');
+const scScale  = document.getElementById('sc-scale');
+const scActive = document.getElementById('sc-active');
+const scMode   = document.getElementById('sc-mode');
 
-const toolCalib = document.getElementById('tool-calib');
-const toolCircle = document.getElementById('tool-circle');
-const toolPolygon = document.getElementById('tool-polygon');
-const toolSelect = document.getElementById('tool-select');
+const mName       = document.getElementById('m-name');
+const mNameTitle  = document.getElementById('m-name-title');
+const mNameInput  = document.getElementById('m-name-input');
+const mNameCancel = document.getElementById('m-name-cancel');
+const mNameOk     = document.getElementById('m-name-ok');
 
-const statusImg = document.getElementById('status-img');
-const statusCalib = document.getElementById('status-calib');
-const statusCoords = document.getElementById('status-coords');
-const statusMode = document.getElementById('status-mode');
+const mCalib       = document.getElementById('m-calib');
+const mCalibInput  = document.getElementById('m-calib-input');
+const mCalibCancel = document.getElementById('m-calib-cancel');
+const mCalibOk     = document.getElementById('m-calib-ok');
 
-const roiDropdownHeader = document.getElementById('roi-dropdown-header');
-const roiDropdownHeaderEl = document.querySelector('.roi-dropdown-header');
-const roiList = document.getElementById('roi-list');
-const roiActiveLabel = document.getElementById('roi-active-label');
-const roiChevron = document.getElementById('roi-chevron');
+const mRename       = document.getElementById('m-rename');
+const mRenameInput  = document.getElementById('m-rename-input');
+const mRenameCancel = document.getElementById('m-rename-cancel');
+const mRenameOk     = document.getElementById('m-rename-ok');
 
-// modals
-const modalName = document.getElementById('modal-name');
-const modalNameTitle = document.getElementById('modal-name-title');
-const inputRoiName = document.getElementById('input-roi-name');
-const modalNameCancel = document.getElementById('modal-name-cancel');
-const modalNameOk = document.getElementById('modal-name-ok');
+// ════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════
+function uid() { return 'r' + (++S._roiSeq); }
 
-const modalCalib = document.getElementById('modal-calib');
-const inputCalibUnits = document.getElementById('input-calib-units');
-const modalCalibCancel = document.getElementById('modal-calib-cancel');
-const modalCalibOk = document.getElementById('modal-calib-ok');
-
-const modalRename = document.getElementById('modal-rename');
-const inputRename = document.getElementById('input-rename');
-const modalRenameCancel = document.getElementById('modal-rename-cancel');
-const modalRenameOk = document.getElementById('modal-rename-ok');
-
-// ═══════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════
-function uid() { return 'roi_' + (++roiCounter); }
-
-function svgEl(tag, attrs) {
-  const el = document.createElementNS(svgNS, tag);
+function mkSvg(tag, attrs) {
+  const el = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
   return el;
 }
 
-function clientToSVG(clientX, clientY) {
-  const rect = canvasWrap.getBoundingClientRect();
-  const ratioX = state.viewBox.w / rect.width;
-  const ratioY = state.viewBox.h / rect.height;
+function clientToSvg(cx, cy) {
+  const rect = wrap.getBoundingClientRect();
   return {
-    x: state.viewBox.x + (clientX - rect.left) * ratioX,
-    y: state.viewBox.y + (clientY - rect.top) * ratioY,
+    x: S.vb.x + (cx - rect.left) / rect.width  * S.vb.w,
+    y: S.vb.y + (cy - rect.top)  / rect.height * S.vb.h,
   };
 }
 
-function updateSVGViewBox() {
-  const vb = state.viewBox;
-  svgRoot.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+// Convert SVG distance to screen pixels
+function svgDistToScreen(d) {
+  const rect = wrap.getBoundingClientRect();
+  return d / S.vb.w * rect.width;
 }
 
-function clampViewBox() {
-  const vb = state.viewBox;
-  const img = state.image;
-  if (!img) return;
-  const margin = vb.w * 0.5;
-  vb.x = Math.max(-margin, Math.min(img.width + margin - vb.w, vb.x));
-  vb.y = Math.max(-margin, Math.min(img.height + margin - vb.h, vb.y));
+function applyVB() {
+  svgEl.setAttribute('viewBox', `${S.vb.x} ${S.vb.y} ${S.vb.w} ${S.vb.h}`);
 }
 
-function setMode(m) {
-  // Cancel polygon creation if switching away
-  if (state.mode === 'polygon' && m !== 'polygon') cancelPolygon();
-
-  state.mode = m;
-  [toolCalib, toolCircle, toolPolygon, toolSelect].forEach(b => b.classList.remove('active'));
-  if (m === 'calib') toolCalib.classList.add('active');
-  else if (m === 'circle') toolCircle.classList.add('active');
-  else if (m === 'polygon') toolPolygon.classList.add('active');
-  else toolSelect.classList.add('active');
-  statusMode.querySelector('span').textContent = m.toUpperCase();
-}
-
-function setActiveROI(id) {
-  state.activeROI = id;
-  renderAllROIs();
-  updateDropdownLabel();
-}
-
-function updateDropdownLabel() {
-  const roi = state.rois.find(r => r.id === state.activeROI);
-  roiActiveLabel.textContent = roi ? roi.name : '— kein ROI —';
-}
-
-function updateStatus() {
-  if (state.image) {
-    statusImg.querySelector('span').textContent =
-      `${state.image.width}×${state.image.height}`;
-    statusImg.classList.remove('warn');
-  } else {
-    statusImg.querySelector('span').textContent = '—';
-    statusImg.classList.add('warn');
-  }
-  if (state.unitPerPx) {
-    statusCalib.querySelector('span').textContent =
-      `${state.unitPerPx.toFixed(4)}u/px`;
-    statusCalib.classList.remove('warn');
-  } else {
-    statusCalib.querySelector('span').textContent = '—';
-    statusCalib.classList.add('warn');
-  }
+function clampVB() {
+  if (!S.img) return;
+  const m = S.vb.w * 0.5;
+  S.vb.x = Math.max(-m, Math.min(S.img.w + m - S.vb.w, S.vb.x));
+  S.vb.y = Math.max(-m, Math.min(S.img.h + m - S.vb.h, S.vb.y));
 }
 
 function roiColor(roi) {
-  if (roi.id === state.calibROI) return '#47ffe8';
-  const palette = ['#e8ff47','#ff6b81','#a29bfe','#fd79a8','#55efc4','#fdcb6e'];
-  const idx = state.rois.indexOf(roi) % palette.length;
-  return palette[idx];
+  if (roi.isCalib) return '#47ffe8';
+  const idx = S.rois.indexOf(roi);
+  return PALETTE[idx % PALETTE.length];
 }
 
-// ═══════════════════════════════════════════════════════
-// IMAGE LOADING
-// ═══════════════════════════════════════════════════════
-btnLoadImg.addEventListener('click', () => fileInput.click());
+function getRoi(id) { return S.rois.find(r => r.id === id); }
+
+function openModal(m) {
+  m.classList.add('open');
+  setTimeout(() => m.querySelector('input')?.focus(), 80);
+}
+function closeModal(m) { m.classList.remove('open'); }
+
+// ════════════════════════════════════════════════
+// STATUS & TOOLBAR UPDATE
+// ════════════════════════════════════════════════
+function updateStatus() {
+  if (S.img) {
+    scImg.querySelector('b').textContent = `${S.img.w}×${S.img.h}`;
+    scImg.classList.remove('warn');
+  } else {
+    scImg.querySelector('b').textContent = '—';
+  }
+  if (S.unitPerPx) {
+    scScale.querySelector('b').textContent = S.unitPerPx.toFixed(4) + 'u/px';
+    scScale.classList.remove('warn');
+  } else {
+    scScale.querySelector('b').textContent = '—';
+    scScale.classList.add('warn');
+  }
+  const ar = getRoi(S.activeId);
+  scActive.querySelector('b').textContent = ar ? ar.name : '—';
+  scMode.querySelector('b').textContent = S.mode.toUpperCase();
+  roiCount.textContent = S.rois.length ? `(${S.rois.length})` : '';
+}
+
+function updateToolbar() {
+  // tool buttons
+  [btnCalib, btnCircle, btnPoly].forEach(b => b.classList.remove('on'));
+  if (S.mode === 'calib')  btnCalib.classList.add('on');
+  if (S.mode === 'circle') btnCircle.classList.add('on');
+  if (S.mode === 'poly' || S.mode === 'addpt') btnPoly.classList.add('on');
+
+  // poly-only buttons
+  const inPoly = S.mode === 'poly';
+  btnClosePoly.style.display = inPoly && S.polyPts.length >= 3 ? 'inline-block' : 'none';
+
+  // add-point button: visible when active ROI is polygon and mode=select
+  const ar = getRoi(S.activeId);
+  btnAddPt.style.display =
+    (S.mode === 'select' || S.mode === 'addpt') && ar && ar.type === 'polygon'
+      ? 'inline-block' : 'none';
+  btnAddPt.classList.toggle('on', S.mode === 'addpt');
+}
+
+// ════════════════════════════════════════════════
+// IMAGE LOAD
+// ════════════════════════════════════════════════
+btnLoad.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
-    state.image = { width: img.width, height: img.height, src: url };
-    // Clear existing
-    layerImage.innerHTML = '';
-    layerROIs.innerHTML = '';
-    layerHandles.innerHTML = '';
-    layerPolyPreview.innerHTML = '';
-    state.rois = [];
-    state.activeROI = null;
-    state.unitPerPx = null;
-    state.calibROI = null;
-    roiCounter = 0;
+    // reset
+    S.img = { w: img.width, h: img.height, src: url };
+    S.rois = []; S.activeId = null; S.unitPerPx = null;
+    S.calibId = null; S._roiSeq = 0;
+    S.polyPts = []; S.polyName = '';
+    lImg.innerHTML = ''; lRoi.innerHTML = '';
+    lHandles.innerHTML = ''; lPoly.innerHTML = '';
 
-    // Embed image
-    const imgEl = svgEl('image', {
-      href: url,
-      x: 0, y: 0,
-      width: img.width,
-      height: img.height,
+    const imgNode = mkSvg('image', {
+      href: url, x: 0, y: 0,
+      width: img.width, height: img.height,
       preserveAspectRatio: 'none',
     });
-    layerImage.appendChild(imgEl);
+    lImg.appendChild(imgNode);
 
-    // Set viewBox
-    const cw = canvasWrap.clientWidth;
-    const ch = canvasWrap.clientHeight;
-    const scale = Math.min(cw / img.width, ch / img.height) * 0.9;
-    state.viewBox = {
-      x: -(cw / scale - img.width) / 2,
-      y: -(ch / scale - img.height) / 2,
-      w: cw / scale,
-      h: ch / scale,
+    // fit
+    const cw = wrap.clientWidth, ch = wrap.clientHeight;
+    const sc = Math.min(cw / img.width, ch / img.height) * 0.92;
+    S.vb = {
+      x: -(cw / sc - img.width) / 2,
+      y: -(ch / sc - img.height) / 2,
+      w: cw / sc, h: ch / sc,
     };
-    updateSVGViewBox();
-
-    emptyState.style.display = 'none';
-    toolCalib.disabled = false;
-    toolCircle.disabled = false;
-    toolPolygon.disabled = false;
+    applyVB();
+    emptyEl.style.display = 'none';
+    btnCalib.disabled = false;
+    btnCircle.disabled = false;
+    btnPoly.disabled = false;
     btnExport.disabled = false;
     setMode('calib');
-    updateStatus();
-    renderROIList();
+    updateStatus(); updateToolbar(); renderRoiList();
   };
   img.src = url;
   fileInput.value = '';
 });
 
-// ═══════════════════════════════════════════════════════
-// ZOOM / PAN
-// ═══════════════════════════════════════════════════════
-let lastPinchDist = 0;
-let lastPinchCenter = null;
+// ════════════════════════════════════════════════
+// MODE
+// ════════════════════════════════════════════════
+function setMode(m) {
+  if (S.mode === 'poly' && m !== 'poly' && m !== 'addpt') cancelPoly();
+  if (S.mode === 'addpt' && m !== 'addpt') S.addPtMode = false;
+  S.mode = m;
+  updateStatus(); updateToolbar();
+}
 
-function getTouchDist(t) {
+// ════════════════════════════════════════════════
+// ZOOM / PAN  — only fires when NOT dragging handle
+// ════════════════════════════════════════════════
+let lastPinchDist = 0;
+
+function pxDist(t) {
   const dx = t[1].clientX - t[0].clientX;
   const dy = t[1].clientY - t[0].clientY;
-  return Math.sqrt(dx*dx + dy*dy);
+  return Math.hypot(dx, dy);
 }
 
-canvasWrap.addEventListener('touchstart', e => {
-  if (state.isDragging) return;
-
+wrap.addEventListener('touchstart', e => {
+  if (S.drag) return; // handle drag active — ignore pan/zoom
   if (e.touches.length === 2) {
-    // Pinch start
-    state.pan.active = false;
-    lastPinchDist = getTouchDist(e.touches);
-    lastPinchCenter = {
-      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-      y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-    };
+    lastPinchDist = pxDist(e.touches);
     e.preventDefault();
     return;
   }
-
   if (e.touches.length === 1) {
     const t = e.touches[0];
-    // If over a handle → don't pan
-    if (e.target.dataset.handle) return;
-    if (e.target.dataset.roiClick) return;
-
-    state.pan = {
-      active: true,
-      startX: t.clientX,
-      startY: t.clientY,
-      vbStart: { ...state.viewBox },
+    S.pan = {
+      sx: t.clientX, sy: t.clientY,
+      vb: { ...S.vb },
+      moved: false,
     };
   }
 }, { passive: false });
 
-canvasWrap.addEventListener('touchmove', e => {
-  if (state.isDragging) {
-    e.preventDefault();
-    return;
-  }
-
+wrap.addEventListener('touchmove', e => {
+  if (S.drag) { e.preventDefault(); return; }
   if (e.touches.length === 2) {
     e.preventDefault();
-    const newDist = getTouchDist(e.touches);
-    const center = {
-      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-      y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-    };
-    const ratio = lastPinchDist / newDist;
-    const svgCenter = clientToSVG(center.x, center.y);
-
-    state.viewBox.w *= ratio;
-    state.viewBox.h *= ratio;
-
-    // Keep center stable
-    const newSvgCenter = clientToSVG(center.x, center.y);
-    state.viewBox.x += svgCenter.x - newSvgCenter.x;
-    state.viewBox.y += svgCenter.y - newSvgCenter.y;
-
-    clampViewBox();
-    updateSVGViewBox();
-    lastPinchDist = newDist;
-    lastPinchCenter = center;
+    const nd = pxDist(e.touches);
+    const ratio = lastPinchDist / nd;
+    const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    const before = clientToSvg(cx, cy);
+    S.vb.w *= ratio; S.vb.h *= ratio;
+    const after = clientToSvg(cx, cy);
+    S.vb.x += before.x - after.x;
+    S.vb.y += before.y - after.y;
+    clampVB(); applyVB();
+    lastPinchDist = nd;
     return;
   }
-
-  if (e.touches.length === 1 && state.pan.active) {
+  if (e.touches.length === 1 && S.pan) {
     e.preventDefault();
     const t = e.touches[0];
-    const rect = canvasWrap.getBoundingClientRect();
-    const ratioX = state.viewBox.w / rect.width;
-    const ratioY = state.viewBox.h / rect.height;
-    state.viewBox.x = state.pan.vbStart.x - (t.clientX - state.pan.startX) * ratioX;
-    state.viewBox.y = state.pan.vbStart.y - (t.clientY - state.pan.startY) * ratioY;
-    clampViewBox();
-    updateSVGViewBox();
+    const dx = t.clientX - S.pan.sx;
+    const dy = t.clientY - S.pan.sy;
+    if (Math.hypot(dx, dy) > 5) S.pan.moved = true;
+    const rect = wrap.getBoundingClientRect();
+    S.vb.x = S.pan.vb.x - dx / rect.width  * S.pan.vb.w;
+    S.vb.y = S.pan.vb.y - dy / rect.height * S.pan.vb.h;
+    clampVB(); applyVB();
   }
 }, { passive: false });
 
-canvasWrap.addEventListener('touchend', e => {
+let _lastTapTime = 0;
+wrap.addEventListener('touchend', e => {
   if (e.touches.length < 2) lastPinchDist = 0;
-  if (e.touches.length === 0) state.pan.active = false;
+  if (e.touches.length === 0) {
+    const moved = S.pan?.moved;
+    S.pan = null;
+    if (!moved && !S.drag) {
+      _lastTapTime = Date.now();
+      handleTap(e.changedTouches[0]);
+    }
+  }
 });
 
-// Mouse wheel zoom
-canvasWrap.addEventListener('wheel', e => {
+
+wrap.addEventListener('wheel', e => {
   e.preventDefault();
-  if (!state.image) return;
-  const factor = e.deltaY > 0 ? 1.1 : 0.9;
-  const svgP = clientToSVG(e.clientX, e.clientY);
-  state.viewBox.w *= factor;
-  state.viewBox.h *= factor;
-  const newSvgP = clientToSVG(e.clientX, e.clientY);
-  state.viewBox.x += svgP.x - newSvgP.x;
-  state.viewBox.y += svgP.y - newSvgP.y;
-  clampViewBox();
-  updateSVGViewBox();
+  if (!S.img) return;
+  const f = e.deltaY > 0 ? 1.1 : 0.9;
+  const p = clientToSvg(e.clientX, e.clientY);
+  S.vb.w *= f; S.vb.h *= f;
+  const p2 = clientToSvg(e.clientX, e.clientY);
+  S.vb.x += p.x - p2.x; S.vb.y += p.y - p2.y;
+  clampVB(); applyVB();
 }, { passive: false });
 
-// ═══════════════════════════════════════════════════════
-// SVG CANVAS TAPS
-// ═══════════════════════════════════════════════════════
-let tapMoved = false;
-let tapStartPt = null;
-
-canvasWrap.addEventListener('touchstart', e => {
-  if (e.touches.length !== 1) return;
-  tapMoved = false;
-  tapStartPt = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-}, { passive: true });
-
-canvasWrap.addEventListener('touchmove', e => {
-  if (!tapStartPt) return;
-  const dx = e.touches[0].clientX - tapStartPt.x;
-  const dy = e.touches[0].clientY - tapStartPt.y;
-  if (Math.sqrt(dx*dx + dy*dy) > 8) tapMoved = true;
-}, { passive: true });
-
-canvasWrap.addEventListener('touchend', e => {
-  if (tapMoved || state.isDragging) return;
-  if (e.changedTouches.length !== 1) return;
-  const t = e.changedTouches[0];
-  // Only handle taps on the background (not handles/ROI shapes)
-  if (e.target.dataset.handle || e.target.dataset.roiClick) return;
-  const pt = clientToSVG(t.clientX, t.clientY);
-  handleCanvasTap(pt, t.clientX, t.clientY);
-}, { passive: true });
-
-// Mouse click fallback
-canvasWrap.addEventListener('click', e => {
-  if (e.target.dataset.handle || e.target.dataset.roiClick) return;
-  const pt = clientToSVG(e.clientX, e.clientY);
-  handleCanvasTap(pt, e.clientX, e.clientY);
+// Mouse pan
+let mousePan = null;
+wrap.addEventListener('mousedown', e => {
+  if (S.drag) return;
+  mousePan = { sx: e.clientX, sy: e.clientY, vb: { ...S.vb }, moved: false };
+});
+document.addEventListener('mousemove', e => {
+  if (!mousePan) return;
+  const dx = e.clientX - mousePan.sx;
+  const dy = e.clientY - mousePan.sy;
+  if (Math.hypot(dx, dy) > 4) mousePan.moved = true;
+  const rect = wrap.getBoundingClientRect();
+  S.vb.x = mousePan.vb.x - dx / rect.width  * mousePan.vb.w;
+  S.vb.y = mousePan.vb.y - dy / rect.height * mousePan.vb.h;
+  clampVB(); applyVB();
+});
+document.addEventListener('mouseup', e => {
+  if (!mousePan) return;
+  const moved = mousePan.moved;
+  mousePan = null;
+  if (!moved && Date.now() - _lastTapTime > 300) {
+    handleTap({ clientX: e.clientX, clientY: e.clientY });
+  }
 });
 
-function handleCanvasTap(pt, cx, cy) {
-  if (!state.image) return;
 
-  if (state.mode === 'calib') {
-    // Show name modal then place calib circle
-    pendingRoiType = 'circle';
-    pendingCalib = true;
-    pendingCenter = pt;
-    modalNameTitle.textContent = '⊙ KALIBRIERUNGS-KREIS';
-    inputRoiName.value = 'Fangradius';
-    openModal(modalName);
+// ════════════════════════════════════════════════
+// TAP HANDLER (canvas tap — no handle, no panel)
+// ════════════════════════════════════════════════
+function handleTap(t) {
+  if (!S.img) return;
+  const pt = clientToSvg(t.clientX, t.clientY);
+
+  if (S.mode === 'calib') {
+    // Place calib circle
+    mNameTitle.textContent = '⊙ KALIBRIERUNGS-KREIS';
+    mNameInput.value = 'Fangradius';
+    openModal(mName);
+    mNameOk._action = () => {
+      const name = mNameInput.value.trim() || 'Fangradius';
+      closeModal(mName);
+      const roi = addCircleRoi(name, pt, true);
+      openModal(mCalib);
+    };
     return;
   }
 
-  if (state.mode === 'circle') {
-    pendingRoiType = 'circle';
-    pendingCalib = false;
-    pendingCenter = pt;
-    modalNameTitle.textContent = '○ NEUER KREIS';
-    inputRoiName.value = '';
-    openModal(modalName);
+  if (S.mode === 'circle') {
+    mNameTitle.textContent = '○ NEUER KREIS';
+    mNameInput.value = '';
+    openModal(mName);
+    mNameOk._action = () => {
+      const name = mNameInput.value.trim() || ('Kreis_' + S._roiSeq);
+      closeModal(mName);
+      addCircleRoi(name, pt, false);
+      setMode('select');
+    };
     return;
   }
 
-  if (state.mode === 'polygon') {
-    addPolygonPoint(pt);
-    return;
-  }
-}
-
-// ─── Pending state for modals ───
-let pendingRoiType = null;
-let pendingCalib = false;
-let pendingCenter = null;
-
-// ═══════════════════════════════════════════════════════
-// MODAL LOGIC
-// ═══════════════════════════════════════════════════════
-function openModal(m) {
-  m.classList.add('open');
-  setTimeout(() => m.querySelector('input')?.focus(), 100);
-}
-function closeModal(m) {
-  m.classList.remove('open');
-}
-
-modalNameCancel.addEventListener('click', () => {
-  closeModal(modalName);
-  pendingRoiType = null;
-  if (state.mode !== 'polygon') setMode('select');
-});
-
-modalNameOk.addEventListener('click', () => {
-  const name = inputRoiName.value.trim() || ('ROI_' + (roiCounter + 1));
-  closeModal(modalName);
-
-  if (pendingRoiType === 'circle') {
-    const roi = createCircleROI(name, pendingCenter, pendingCalib);
-    if (pendingCalib) {
-      // Show calib modal
-      openModal(modalCalib);
+  if (S.mode === 'poly') {
+    // Check if tapping near first point → close
+    if (S.polyPts.length >= 3) {
+      const fp = S.polyPts[0];
+      const screenDist = svgDistToScreen(Math.hypot(pt.x - fp.x, pt.y - fp.y));
+      if (screenDist < POLY_CLOSE_HIT) {
+        closePoly();
+        return;
+      }
     }
-  } else if (pendingRoiType === 'polygon') {
-    pendingPolyName = name;
-    state.mode = 'polygon';
-    // Mode was already polygon, just set the name and continue
-  }
-  pendingRoiType = null;
-});
-
-inputRoiName.addEventListener('keydown', e => {
-  if (e.key === 'Enter') modalNameOk.click();
-});
-
-modalCalibCancel.addEventListener('click', () => closeModal(modalCalib));
-modalCalibOk.addEventListener('click', () => {
-  const units = parseFloat(inputCalibUnits.value);
-  if (!units || units <= 0) return;
-  const roi = state.rois.find(r => r.id === state.calibROI);
-  if (roi) {
-    state.unitPerPx = units / roi.geometry.r;
-    updateStatus();
-  }
-  closeModal(modalCalib);
-  setMode('select');
-});
-
-inputCalibUnits.addEventListener('keydown', e => {
-  if (e.key === 'Enter') modalCalibOk.click();
-});
-
-// Calib button re-open
-toolCalib.addEventListener('click', () => {
-  if (!state.image) return;
-  if (state.calibROI) {
-    // Re-calibrate existing
-    openModal(modalCalib);
+    S.polyPts.push({ ...pt });
+    renderPolyPreview();
+    updateToolbar();
     return;
   }
+
+  if (S.mode === 'addpt') {
+    // Find nearest edge of active polygon and insert point
+    const roi = getRoi(S.activeId);
+    if (!roi || roi.type !== 'polygon') { setMode('select'); return; }
+    insertPolyPoint(roi, pt);
+    setMode('select');
+    return;
+  }
+}
+
+// ════════════════════════════════════════════════
+// MODAL LOGIC
+// ════════════════════════════════════════════════
+mNameCancel.addEventListener('click', () => { closeModal(mName); setMode('select'); });
+mNameOk.addEventListener('click', () => { if (mNameOk._action) mNameOk._action(); });
+mNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') mNameOk.click(); });
+
+mCalibCancel.addEventListener('click', () => closeModal(mCalib));
+mCalibOk.addEventListener('click', () => {
+  const v = parseFloat(mCalibInput.value);
+  if (!v || v <= 0) return;
+  const roi = getRoi(S.calibId);
+  if (roi) S.unitPerPx = v / roi.geo.r;
+  closeModal(mCalib);
+  setMode('select');
+  updateStatus();
+});
+mCalibInput.addEventListener('keydown', e => { if (e.key === 'Enter') mCalibOk.click(); });
+
+mRenameCancel.addEventListener('click', () => closeModal(mRename));
+mRenameOk.addEventListener('click', () => {
+  const roi = getRoi(mRenameOk._roiId);
+  if (roi) { roi.name = mRenameInput.value.trim() || roi.name; }
+  closeModal(mRename); renderRoiList(); updateStatus();
+});
+mRenameInput.addEventListener('keydown', e => { if (e.key === 'Enter') mRenameOk.click(); });
+
+// ════════════════════════════════════════════════
+// TOOLBAR BUTTONS
+// ════════════════════════════════════════════════
+btnCalib.addEventListener('click', () => {
+  if (!S.img) return;
+  if (S.calibId) { openModal(mCalib); return; }
   setMode('calib');
 });
 
-// ═══════════════════════════════════════════════════════
-// ROI CREATION
-// ═══════════════════════════════════════════════════════
-function createCircleROI(name, center, isCalib) {
-  // Default radius: 5% of shorter image dimension
-  const defaultR = Math.min(state.image.width, state.image.height) * 0.05;
-  const id = uid();
+btnCircle.addEventListener('click', () => { if (S.img) setMode('circle'); });
 
-  const roi = {
-    id,
-    name,
-    type: 'circle',
-    isCalib,
-    geometry: { cx: center.x, cy: center.y, r: defaultR },
-    svgEls: {},
-    handleEls: {},
+btnPoly.addEventListener('click', () => {
+  if (!S.img) return;
+  if (S.mode === 'poly') return; // already drawing
+  // start poly
+  S.polyPts = [];
+  mNameTitle.textContent = '⬡ NEUES POLYGON';
+  mNameInput.value = '';
+  openModal(mName);
+  mNameOk._action = () => {
+    S.polyName = mNameInput.value.trim() || ('Poly_' + (S._roiSeq + 1));
+    closeModal(mName);
+    setMode('poly');
   };
+});
 
-  state.rois.push(roi);
+btnClosePoly.addEventListener('click', () => closePoly());
+
+btnAddPt.addEventListener('click', () => {
+  if (S.mode === 'addpt') { setMode('select'); }
+  else { setMode('addpt'); }
+});
+
+// ROI panel
+btnRois.addEventListener('click', () => {
+  S.roiPanelOpen = !S.roiPanelOpen;
+  roiPanel.classList.toggle('open', S.roiPanelOpen);
+});
+roiPanel.addEventListener('click', e => {
+  if (e.target === roiPanel) { S.roiPanelOpen = false; roiPanel.classList.remove('open'); }
+});
+
+// ════════════════════════════════════════════════
+// ROI CREATION
+// ════════════════════════════════════════════════
+function addCircleRoi(name, center, isCalib) {
+  const defR = S.img ? Math.min(S.img.w, S.img.h) * 0.06 : 50;
+  const roi = {
+    id: uid(), name, type: 'circle', isCalib,
+    geo: { cx: center.x, cy: center.y, r: defR },
+    svgG: null,
+  };
+  S.rois.push(roi);
   if (isCalib) {
-    if (state.calibROI) {
-      // Remove old calib
-      const old = state.rois.find(r => r.id === state.calibROI);
-      if (old) removeROISVG(old);
-    }
-    state.calibROI = id;
+    if (S.calibId) removeRoi(S.calibId);
+    S.calibId = roi.id;
   }
-
-  buildCircleSVG(roi);
-  setActiveROI(id);
-  renderROIList();
+  buildRoiSvg(roi);
+  activateRoi(roi.id);
+  renderRoiList(); updateStatus(); updateToolbar();
   return roi;
 }
 
-function buildCircleSVG(roi) {
-  const g = roi.geometry;
-  const isActive = roi.id === state.activeROI;
-  const color = roiColor(roi);
-
-  // Main circle
-  const circle = svgEl('circle', {
-    cx: g.cx, cy: g.cy, r: g.r,
-    fill: color + '12',
-    stroke: color,
-    'stroke-width': isActive ? 2 : 1,
-    opacity: isActive ? 1 : 0.4,
-  });
-  circle.dataset.roiClick = roi.id;
-  circle.addEventListener('click', () => setActiveROI(roi.id));
-  circle.addEventListener('touchend', (e) => {
-    if (!tapMoved) { e.preventDefault(); setActiveROI(roi.id); }
-  });
-
-  layerROIs.appendChild(circle);
-  roi.svgEls.circle = circle;
-
-  // Handles: center + radius
-  buildCircleHandles(roi);
+function addPolyRoi(name, points) {
+  const roi = {
+    id: uid(), name, type: 'polygon', isCalib: false,
+    geo: { points: points.map(p => ({ ...p })) },
+    svgG: null,
+  };
+  S.rois.push(roi);
+  buildRoiSvg(roi);
+  activateRoi(roi.id);
+  renderRoiList(); updateStatus(); updateToolbar();
+  return roi;
 }
 
-function buildCircleHandles(roi) {
-  // Remove old handles
-  if (roi.handleEls.center) roi.handleEls.center.remove();
-  if (roi.handleEls.radius) roi.handleEls.radius.remove();
-
-  if (roi.id !== state.activeROI) return;
-
-  const g = roi.geometry;
-  const color = roiColor(roi);
-  const hs = 18; // hit size
-
-  // Center handle
-  const centerH = svgEl('circle', {
-    cx: g.cx, cy: g.cy, r: hs / 2,
-    fill: color,
-    stroke: '#0d0f14',
-    'stroke-width': 2,
-    cursor: 'move',
-  });
-  centerH.dataset.handle = 'center';
-  layerHandles.appendChild(centerH);
-  roi.handleEls.center = centerH;
-  setupHandleDrag(centerH, roi, 'circle-center');
-
-  // Radius handle (east)
-  const radiusH = svgEl('rect', {
-    x: g.cx + g.r - hs/2, y: g.cy - hs/2,
-    width: hs, height: hs,
-    fill: color,
-    stroke: '#0d0f14',
-    'stroke-width': 2,
-    rx: 2,
-    cursor: 'ew-resize',
-  });
-  radiusH.dataset.handle = 'radius';
-  layerHandles.appendChild(radiusH);
-  roi.handleEls.radius = radiusH;
-  setupHandleDrag(radiusH, roi, 'circle-radius');
-}
-
-let pendingPolyName = '';
-
-function startPolygonCreation() {
-  pendingPolyName = '';
-  modalNameTitle.textContent = '⬡ NEUES POLYGON';
-  inputRoiName.value = '';
-  pendingRoiType = 'polygon';
-  openModal(modalName);
-}
-
-function addPolygonPoint(pt) {
-  if (!pendingPolyName) {
-    // Need name first
-    startPolygonCreation();
-    return;
-  }
-  state.polyPoints.push({ x: pt.x, y: pt.y });
-  renderPolyPreview();
-}
-
+// ════════════════════════════════════════════════
+// POLYGON PREVIEW & CLOSE
+// ════════════════════════════════════════════════
 function renderPolyPreview() {
-  layerPolyPreview.innerHTML = '';
-  const pts = state.polyPoints;
-  if (pts.length === 0) return;
-
+  lPoly.innerHTML = '';
+  const pts = S.polyPts;
+  if (!pts.length) return;
   const color = '#e8ff47';
 
-  // Points
-  pts.forEach((p, i) => {
-    const c = svgEl('circle', {
-      cx: p.x, cy: p.y, r: 8,
-      fill: color,
-      stroke: '#0d0f14',
-      'stroke-width': 2,
-    });
-    layerPolyPreview.appendChild(c);
-  });
-
-  // Line
   if (pts.length >= 2) {
-    const d = 'M ' + pts.map(p => `${p.x},${p.y}`).join(' L ');
-    const path = svgEl('path', {
-      d,
-      fill: 'none',
-      stroke: color,
-      'stroke-width': 1.5,
-      'stroke-dasharray': '6 4',
-    });
-    layerPolyPreview.insertBefore(path, layerPolyPreview.firstChild);
+    const d = 'M' + pts.map(p => `${p.x},${p.y}`).join('L');
+    lPoly.appendChild(mkSvg('path', {
+      d, fill: 'none', stroke: color,
+      'stroke-width': 1.5, 'stroke-dasharray': '7 4',
+      'pointer-events': 'none',
+    }));
   }
-
-  // Close hint
-  if (pts.length >= 3) {
-    const closeEl = svgEl('circle', {
-      cx: pts[0].x, cy: pts[0].y, r: 12,
-      fill: 'none',
-      stroke: color,
-      'stroke-width': 2,
-      'stroke-dasharray': '4 2',
-      opacity: 0.6,
+  pts.forEach((p, i) => {
+    const c = mkSvg('circle', {
+      cx: p.x, cy: p.y, r: 9,
+      fill: color, stroke: '#0d0f14', 'stroke-width': 2,
+      'pointer-events': 'none',
     });
-    layerPolyPreview.appendChild(closeEl);
+    lPoly.appendChild(c);
+  });
+  // Close hint ring around first point
+  if (pts.length >= 3) {
+    lPoly.appendChild(mkSvg('circle', {
+      cx: pts[0].x, cy: pts[0].y, r: 16,
+      fill: 'none', stroke: color,
+      'stroke-width': 1.5, 'stroke-dasharray': '4 3',
+      opacity: '0.5', 'pointer-events': 'none',
+    }));
   }
 }
 
-function closePolygon() {
-  const pts = state.polyPoints;
-  if (pts.length < 3) return;
-
-  const id = uid();
-  const roi = {
-    id,
-    name: pendingPolyName || ('Polygon_' + roiCounter),
-    type: 'polygon',
-    isCalib: false,
-    geometry: { points: pts.map(p => ({ ...p })) },
-    svgEls: {},
-    handleEls: {},
-  };
-
-  state.rois.push(roi);
-  layerPolyPreview.innerHTML = '';
-  state.polyPoints = [];
-  pendingPolyName = '';
-
-  buildPolygonSVG(roi);
-  setActiveROI(id);
-  renderROIList();
+function closePoly() {
+  if (S.polyPts.length < 3) return;
+  addPolyRoi(S.polyName || ('Poly_' + S._roiSeq), S.polyPts);
+  S.polyPts = []; S.polyName = '';
+  lPoly.innerHTML = '';
   setMode('select');
 }
 
-function cancelPolygon() {
-  state.polyPoints = [];
-  pendingPolyName = '';
-  layerPolyPreview.innerHTML = '';
+function cancelPoly() {
+  S.polyPts = []; S.polyName = '';
+  lPoly.innerHTML = '';
 }
 
-function buildPolygonSVG(roi) {
-  const pts = roi.geometry.points;
-  const isActive = roi.id === state.activeROI;
+// ════════════════════════════════════════════════
+// BUILD / REBUILD ROI SVG
+// ════════════════════════════════════════════════
+function buildRoiSvg(roi) {
+  if (roi.svgG) roi.svgG.remove();
+  const isActive = roi.id === S.activeId;
   const color = roiColor(roi);
 
-  const pointsStr = pts.map(p => `${p.x},${p.y}`).join(' ');
-  const poly = svgEl('polygon', {
-    points: pointsStr,
-    fill: color + '10',
-    stroke: color,
-    'stroke-width': isActive ? 2 : 1,
-    opacity: isActive ? 1 : 0.4,
-  });
-  poly.dataset.roiClick = roi.id;
-  poly.addEventListener('click', () => setActiveROI(roi.id));
-  poly.addEventListener('touchend', (e) => {
-    if (!tapMoved) { e.preventDefault(); setActiveROI(roi.id); }
-  });
+  const g = document.createElementNS(NS, 'g');
+  g.dataset.roiId = roi.id;
 
-  layerROIs.appendChild(poly);
-  roi.svgEls.polygon = poly;
+  // ── CRITICAL: pointer-events NONE on all ROI shapes ──
+  // ROI shapes never capture touch/mouse — only handles do.
+  if (roi.type === 'circle') {
+    const c = mkSvg('circle', {
+      cx: roi.geo.cx, cy: roi.geo.cy, r: roi.geo.r,
+      fill: color + (isActive ? '18' : '08'),
+      stroke: color,
+      'stroke-width': isActive ? 2 : 0.8,
+      opacity: isActive ? 1 : 0.5,
+      'pointer-events': 'none',
+    });
+    g.appendChild(c);
+  } else {
+    const poly = mkSvg('polygon', {
+      points: roi.geo.points.map(p => `${p.x},${p.y}`).join(' '),
+      fill: color + (isActive ? '18' : '08'),
+      stroke: color,
+      'stroke-width': isActive ? 2 : 0.8,
+      opacity: isActive ? 1 : 0.5,
+      'pointer-events': 'none',
+    });
+    g.appendChild(poly);
+  }
 
-  buildPolygonHandles(roi);
+  lRoi.appendChild(g);
+  roi.svgG = g;
+
+  // Build handles only for active ROI
+  buildHandles(roi);
 }
 
-function buildPolygonHandles(roi) {
-  // Remove old
-  if (roi.handleEls.points) roi.handleEls.points.forEach(h => h.remove());
-  if (roi.handleEls.midpoints) roi.handleEls.midpoints.forEach(h => h.remove());
-  roi.handleEls.points = [];
-  roi.handleEls.midpoints = [];
+function rebuildRoi(roi) {
+  buildRoiSvg(roi);
+}
 
-  if (roi.id !== state.activeROI) return;
+function buildHandles(roi) {
+  // Remove old handles
+  lHandles.querySelectorAll(`[data-hroi="${roi.id}"]`).forEach(el => el.remove());
+  if (roi.id !== S.activeId) return;
 
-  const pts = roi.geometry.points;
   const color = roiColor(roi);
-  const hs = 18;
 
-  pts.forEach((p, i) => {
-    const h = svgEl('circle', {
-      cx: p.x, cy: p.y, r: hs / 2,
-      fill: color,
-      stroke: '#0d0f14',
-      'stroke-width': 2,
+  if (roi.type === 'circle') {
+    // Center handle
+    const ch = mkSvg('circle', {
+      cx: roi.geo.cx, cy: roi.geo.cy,
+      r: HANDLE_HIT / 2,
+      fill: color, stroke: '#0d0f14', 'stroke-width': 2,
       cursor: 'move',
     });
-    h.dataset.handle = 'poly-' + i;
-    layerHandles.appendChild(h);
-    roi.handleEls.points.push(h);
-    setupHandleDrag(h, roi, 'poly-point', i);
+    ch.dataset.htype = 'cc'; ch.dataset.hroi = roi.id;
+    lHandles.appendChild(ch);
+    attachHandleDrag(ch, roi, moveCenterHandle);
 
-    // Long press to delete point
-    let longPressTimer = null;
-    h.addEventListener('touchstart', () => {
-      longPressTimer = setTimeout(() => {
-        if (pts.length > 3) {
-          pts.splice(i, 1);
-          rebuildROISVG(roi);
-        }
-      }, 600);
-    }, { passive: true });
-    h.addEventListener('touchend', () => clearTimeout(longPressTimer));
-    h.addEventListener('touchmove', () => clearTimeout(longPressTimer));
-  });
-
-  // Midpoint handles (insert new point)
-  pts.forEach((p, i) => {
-    const next = pts[(i + 1) % pts.length];
-    const mx = (p.x + next.x) / 2;
-    const my = (p.y + next.y) / 2;
-    const mh = svgEl('rect', {
-      x: mx - 7, y: my - 7,
-      width: 14, height: 14,
-      fill: '#0d0f14',
-      stroke: color,
-      'stroke-width': 1.5,
-      rx: 2,
-      opacity: 0.7,
-      cursor: 'copy',
+    // Radius handle (east)
+    const rh = mkSvg('rect', {
+      x: roi.geo.cx + roi.geo.r - HANDLE_HIT/2,
+      y: roi.geo.cy - HANDLE_HIT/2,
+      width: HANDLE_HIT, height: HANDLE_HIT,
+      fill: color, stroke: '#0d0f14', 'stroke-width': 2,
+      rx: 3, cursor: 'ew-resize',
     });
-    mh.dataset.handle = 'poly-mid-' + i;
+    rh.dataset.htype = 'cr'; rh.dataset.hroi = roi.id;
+    lHandles.appendChild(rh);
+    attachHandleDrag(rh, roi, moveRadiusHandle);
 
-    // Tap to insert point
-    let midMoved = false;
-    let midStart = null;
-    mh.addEventListener('touchstart', e => {
-      midMoved = false;
-      midStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }, { passive: true });
-    mh.addEventListener('touchmove', e => {
-      if (!midStart) return;
-      const dx = e.touches[0].clientX - midStart.x;
-      const dy = e.touches[0].clientY - midStart.y;
-      if (Math.sqrt(dx*dx+dy*dy) > 6) midMoved = true;
-    }, { passive: true });
-    mh.addEventListener('touchend', e => {
-      if (!midMoved) {
-        pts.splice(i + 1, 0, { x: mx, y: my });
-        rebuildROISVG(roi);
-      }
-    });
-    mh.addEventListener('click', () => {
-      pts.splice(i + 1, 0, { x: mx, y: my });
-      rebuildROISVG(roi);
-    });
+  } else {
+    // Vertex handles
+    roi.geo.points.forEach((p, i) => {
+      const h = mkSvg('circle', {
+        cx: p.x, cy: p.y, r: HANDLE_HIT / 2,
+        fill: color, stroke: '#0d0f14', 'stroke-width': 2,
+        cursor: 'move',
+      });
+      h.dataset.htype = 'pv'; h.dataset.hroiIdx = i; h.dataset.hroi = roi.id;
+      lHandles.appendChild(h);
+      attachHandleDrag(h, roi, (roi, svg, startGeo, dx, dy) => {
+        roi.geo.points[i].x = startGeo.points[i].x + dx;
+        roi.geo.points[i].y = startGeo.points[i].y + dy;
+      });
 
-    layerHandles.appendChild(mh);
-    roi.handleEls.midpoints.push(mh);
-  });
+      // Long press: delete vertex (min 3 points)
+      let lpt = null;
+      h.addEventListener('touchstart', () => {
+        lpt = setTimeout(() => {
+          if (roi.geo.points.length > 3) {
+            roi.geo.points.splice(i, 1);
+            rebuildRoi(roi);
+          }
+        }, 600);
+      }, { passive: true });
+      ['touchend','touchmove'].forEach(ev => h.addEventListener(ev, () => clearTimeout(lpt)));
+    });
+  }
 }
 
-// ═══════════════════════════════════════════════════════
-// HANDLE DRAG
-// ═══════════════════════════════════════════════════════
-function setupHandleDrag(el, roi, type, idx) {
-  let startSvgPt = null;
-  let startGeom = null;
+// ════════════════════════════════════════════════
+// HANDLE MOVE FUNCTIONS
+// ════════════════════════════════════════════════
+function moveCenterHandle(roi, svgPt, startGeo, dx, dy) {
+  roi.geo.cx = startGeo.cx + dx;
+  roi.geo.cy = startGeo.cy + dy;
+}
+function moveRadiusHandle(roi, svgPt, startGeo, dx, dy) {
+  const nx = svgPt.x, ny = svgPt.y;
+  roi.geo.r = Math.max(4, Math.hypot(nx - roi.geo.cx, ny - roi.geo.cy));
+}
 
-  function onStart(clientX, clientY) {
-    state.isDragging = true;
-    state.pan.active = false;
-    startSvgPt = clientToSVG(clientX, clientY);
-    startGeom = JSON.parse(JSON.stringify(roi.geometry));
+// ════════════════════════════════════════════════
+// HANDLE DRAG — touch & mouse
+// ════════════════════════════════════════════════
+function attachHandleDrag(el, roi, moveFn) {
+  let startSvg = null, startGeo = null;
+
+  function begin(cx, cy) {
+    startSvg = clientToSvg(cx, cy);
+    startGeo = JSON.parse(JSON.stringify(roi.geo));
+    S.drag = true;
+    S.pan = null;
   }
-
-  function onMove(clientX, clientY) {
-    if (!state.isDragging) return;
-    const pt = clientToSVG(clientX, clientY);
-    const dx = pt.x - startSvgPt.x;
-    const dy = pt.y - startSvgPt.y;
-
-    if (type === 'circle-center') {
-      roi.geometry.cx = startGeom.cx + dx;
-      roi.geometry.cy = startGeom.cy + dy;
-    } else if (type === 'circle-radius') {
-      const newR = Math.sqrt(
-        Math.pow(pt.x - roi.geometry.cx, 2) +
-        Math.pow(pt.y - roi.geometry.cy, 2)
-      );
-      roi.geometry.r = Math.max(5, newR);
-    } else if (type === 'poly-point') {
-      roi.geometry.points[idx].x = startGeom.points[idx].x + dx;
-      roi.geometry.points[idx].y = startGeom.points[idx].y + dy;
-    }
-
-    updateROISVG(roi);
-    updateStatusCoords(pt);
+  function move(cx, cy) {
+    if (!S.drag || !startSvg) return;
+    const cur = clientToSvg(cx, cy);
+    const dx = cur.x - startSvg.x;
+    const dy = cur.y - startSvg.y;
+    moveFn(roi, cur, startGeo, dx, dy);
+    syncRoiSvg(roi);
   }
+  function end() { S.drag = false; startSvg = null; startGeo = null; }
 
-  function onEnd() {
-    state.isDragging = false;
-    if (roi.id === state.calibROI && state.unitPerPx) {
-      // Recalc if calib roi changed
-      // (user may need to re-enter units after resize)
-    }
-  }
-
-  // Touch
   el.addEventListener('touchstart', e => {
-    e.stopPropagation();
-    e.preventDefault();
-    const t = e.touches[0];
-    onStart(t.clientX, t.clientY);
+    e.stopPropagation(); e.preventDefault();
+    begin(e.touches[0].clientX, e.touches[0].clientY);
   }, { passive: false });
-
   el.addEventListener('touchmove', e => {
-    e.stopPropagation();
-    e.preventDefault();
-    const t = e.touches[0];
-    onMove(t.clientX, t.clientY);
+    e.stopPropagation(); e.preventDefault();
+    move(e.touches[0].clientX, e.touches[0].clientY);
   }, { passive: false });
+  el.addEventListener('touchend', e => { e.stopPropagation(); end(); });
 
-  el.addEventListener('touchend', e => {
-    e.stopPropagation();
-    onEnd();
-  });
-
-  // Mouse
   el.addEventListener('mousedown', e => {
-    e.stopPropagation();
-    onStart(e.clientX, e.clientY);
-
-    const mm = ev => onMove(ev.clientX, ev.clientY);
-    const mu = () => { onEnd(); document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
+    e.stopPropagation(); e.preventDefault();
+    begin(e.clientX, e.clientY);
+    const mm = ev => move(ev.clientX, ev.clientY);
+    const mu = () => { end(); document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); };
     document.addEventListener('mousemove', mm);
     document.addEventListener('mouseup', mu);
   });
 }
 
-function updateStatusCoords(pt) {
-  const u = state.unitPerPx;
-  if (u) {
-    statusCoords.querySelector('span').textContent =
-      `${(pt.x * u).toFixed(1)}, ${(pt.y * u).toFixed(1)}`;
-  } else {
-    statusCoords.querySelector('span').textContent =
-      `${pt.x.toFixed(0)}, ${pt.y.toFixed(0)}px`;
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-// RENDER / REBUILD ROI SVG
-// ═══════════════════════════════════════════════════════
-function rebuildROISVG(roi) {
-  removeROISVG(roi);
-  if (roi.type === 'circle') buildCircleSVG(roi);
-  else if (roi.type === 'polygon') buildPolygonSVG(roi);
-}
-
-function removeROISVG(roi) {
-  Object.values(roi.svgEls).forEach(el => el?.remove());
-  Object.values(roi.handleEls).forEach(el => {
-    if (Array.isArray(el)) el.forEach(e => e?.remove());
-    else el?.remove();
-  });
-  roi.svgEls = {};
-  roi.handleEls = {};
-}
-
-function updateROISVG(roi) {
-  const g = roi.geometry;
-  const color = roiColor(roi);
-
+// ════════════════════════════════════════════════
+// SYNC ROI SVG (during drag — no full rebuild)
+// ════════════════════════════════════════════════
+function syncRoiSvg(roi) {
+  if (!roi.svgG) return;
   if (roi.type === 'circle') {
-    const c = roi.svgEls.circle;
+    const c = roi.svgG.querySelector('circle');
     if (c) {
-      c.setAttribute('cx', g.cx);
-      c.setAttribute('cy', g.cy);
-      c.setAttribute('r', g.r);
+      c.setAttribute('cx', roi.geo.cx);
+      c.setAttribute('cy', roi.geo.cy);
+      c.setAttribute('r', roi.geo.r);
     }
-    // Update radius handle
-    if (roi.handleEls.center) {
-      roi.handleEls.center.setAttribute('cx', g.cx);
-      roi.handleEls.center.setAttribute('cy', g.cy);
+    // Sync center handle
+    const ch = lHandles.querySelector(`[data-htype="cc"][data-hroi="${roi.id}"]`);
+    if (ch) { ch.setAttribute('cx', roi.geo.cx); ch.setAttribute('cy', roi.geo.cy); }
+    // Sync radius handle
+    const rh = lHandles.querySelector(`[data-htype="cr"][data-hroi="${roi.id}"]`);
+    if (rh) {
+      rh.setAttribute('x', roi.geo.cx + roi.geo.r - HANDLE_HIT/2);
+      rh.setAttribute('y', roi.geo.cy - HANDLE_HIT/2);
     }
-    if (roi.handleEls.radius) {
-      const hs = 18;
-      roi.handleEls.radius.setAttribute('x', g.cx + g.r - hs/2);
-      roi.handleEls.radius.setAttribute('y', g.cy - hs/2);
-    }
-  } else if (roi.type === 'polygon') {
-    const p = roi.svgEls.polygon;
-    if (p) {
-      p.setAttribute('points', g.points.map(pt => `${pt.x},${pt.y}`).join(' '));
-    }
-    // Update handles
-    if (roi.handleEls.points) {
-      roi.handleEls.points.forEach((h, i) => {
-        if (g.points[i]) {
-          h.setAttribute('cx', g.points[i].x);
-          h.setAttribute('cy', g.points[i].y);
-        }
-      });
-    }
-    if (roi.handleEls.midpoints) {
-      roi.handleEls.midpoints.forEach((h, i) => {
-        const p0 = g.points[i];
-        const p1 = g.points[(i + 1) % g.points.length];
-        if (p0 && p1) {
-          h.setAttribute('x', (p0.x + p1.x) / 2 - 7);
-          h.setAttribute('y', (p0.y + p1.y) / 2 - 7);
-        }
-      });
-    }
+  } else {
+    const poly = roi.svgG.querySelector('polygon');
+    if (poly) poly.setAttribute('points', roi.geo.points.map(p => `${p.x},${p.y}`).join(' '));
+    // sync vertex handles
+    const allHandles = lHandles.querySelectorAll(`[data-htype="pv"][data-hroi="${roi.id}"]`);
+    allHandles.forEach((h, i) => {
+      if (roi.geo.points[i]) {
+        h.setAttribute('cx', roi.geo.points[i].x);
+        h.setAttribute('cy', roi.geo.points[i].y);
+      }
+    });
   }
 }
 
-function renderAllROIs() {
-  // Rebuild all SVG with correct active state
-  state.rois.forEach(roi => rebuildROISVG(roi));
+// ════════════════════════════════════════════════
+// INSERT POLYGON POINT (nearest edge)
+// ════════════════════════════════════════════════
+function insertPolyPoint(roi, pt) {
+  const pts = roi.geo.points;
+  let bestDist = Infinity, bestIdx = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const d = pointToSegmentDist(pt, a, b);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  // Insert after bestIdx
+  pts.splice(bestIdx + 1, 0, { ...pt });
+  rebuildRoi(roi);
 }
 
-// ═══════════════════════════════════════════════════════
-// ROI LIST DROPDOWN
-// ═══════════════════════════════════════════════════════
-roiDropdownHeader.addEventListener('click', () => {
-  const isOpen = roiList.classList.toggle('open');
-  roiDropdownHeaderEl.classList.toggle('open', isOpen);
-  roiChevron.classList.toggle('open', isOpen);
-});
+function pointToSegmentDist(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx*dx + dy*dy;
+  if (len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x-a.x)*dx + (p.y-a.y)*dy) / len2));
+  return Math.hypot(p.x - (a.x + t*dx), p.y - (a.y + t*dy));
+}
 
-function renderROIList() {
-  roiList.innerHTML = '';
-  if (state.rois.length === 0) {
-    roiList.innerHTML = '<div style="padding:12px 14px;font-family:Share Tech Mono,monospace;font-size:11px;color:#5a6280">Keine ROIs vorhanden</div>';
+// ════════════════════════════════════════════════
+// ACTIVATE ROI
+// ════════════════════════════════════════════════
+function activateRoi(id) {
+  S.activeId = id;
+  // Rebuild all ROI SVGs (active state changes visuals)
+  S.rois.forEach(r => rebuildRoi(r));
+  updateStatus(); updateToolbar();
+}
+
+// ════════════════════════════════════════════════
+// REMOVE ROI
+// ════════════════════════════════════════════════
+function removeRoi(id) {
+  const roi = getRoi(id);
+  if (!roi) return;
+  if (roi.svgG) roi.svgG.remove();
+  lHandles.querySelectorAll(`[data-hroi="${id}"]`).forEach(el => el.remove());
+  S.rois = S.rois.filter(r => r.id !== id);
+  if (S.calibId === id) S.calibId = null;
+  if (S.activeId === id) S.activeId = S.rois.length ? S.rois[S.rois.length-1].id : null;
+  if (S.activeId) activateRoi(S.activeId);
+  renderRoiList(); updateStatus(); updateToolbar();
+}
+
+// ════════════════════════════════════════════════
+// ROI LIST PANEL
+// ════════════════════════════════════════════════
+function renderRoiList() {
+  roiPanelInner.innerHTML = '';
+  if (!S.rois.length) {
+    roiPanelInner.innerHTML = '<div class="rpempty">Keine ROIs vorhanden</div>';
+    roiCount.textContent = '';
     return;
   }
-
-  state.rois.forEach(roi => {
-    const item = document.createElement('div');
-    item.className = 'roi-item' + (roi.id === state.activeROI ? ' active' : '');
-
+  roiCount.textContent = `(${S.rois.length})`;
+  S.rois.forEach(roi => {
     const color = roiColor(roi);
-    item.innerHTML = `
-      <div class="roi-dot" style="background:${color}"></div>
-      <div class="roi-item-name">${roi.name}</div>
-      <div class="roi-item-type">${roi.isCalib ? '⊙' : roi.type === 'circle' ? '○' : '⬡'}</div>
-      <div class="roi-del" data-del="${roi.id}">✕</div>
-    `;
+    const div = document.createElement('div');
+    div.className = 'rpitem' + (roi.id === S.activeId ? ' active' : '');
 
-    item.addEventListener('click', (e) => {
-      if (e.target.dataset.del) {
-        deleteROI(e.target.dataset.del);
-        return;
-      }
-      setActiveROI(roi.id);
-      roiList.classList.remove('open');
-      roiDropdownHeaderEl.classList.remove('open');
-      roiChevron.classList.remove('open');
-    });
+    const dot = document.createElement('div');
+    dot.className = 'rpdot';
+    dot.style.background = color;
+
+    const name = document.createElement('div');
+    name.className = 'rpname';
+    name.textContent = roi.name;
+
+    const type = document.createElement('div');
+    type.className = 'rptype';
+    type.textContent = roi.isCalib ? '⊙' : roi.type === 'circle' ? '○' : '⬡';
+
+    const del = document.createElement('div');
+    del.className = 'rpdel';
+    del.textContent = '✕';
+    del.addEventListener('click', e => { e.stopPropagation(); removeRoi(roi.id); });
+    del.addEventListener('touchend', e => { e.stopPropagation(); e.preventDefault(); removeRoi(roi.id); });
 
     // Long press to rename
-    let rlt = null;
-    item.addEventListener('touchstart', () => {
-      rlt = setTimeout(() => {
-        inputRename.value = roi.name;
-        modalRenameOk.dataset.roiId = roi.id;
-        openModal(modalRename);
+    let lpt = null;
+    div.addEventListener('touchstart', () => {
+      lpt = setTimeout(() => {
+        mRenameInput.value = roi.name;
+        mRenameOk._roiId = roi.id;
+        openModal(mRename);
       }, 600);
     }, { passive: true });
-    item.addEventListener('touchend', () => clearTimeout(rlt));
-    item.addEventListener('touchmove', () => clearTimeout(rlt));
+    ['touchend','touchmove'].forEach(ev => div.addEventListener(ev, () => clearTimeout(lpt)));
 
-    roiList.appendChild(item);
+    div.addEventListener('click', e => {
+      if (e.target === del) return;
+      activateRoi(roi.id);
+      S.roiPanelOpen = false;
+      roiPanel.classList.remove('open');
+    });
+
+    div.appendChild(dot);
+    div.appendChild(name);
+    div.appendChild(type);
+    div.appendChild(del);
+    roiPanelInner.appendChild(div);
   });
-
-  updateDropdownLabel();
 }
 
-function deleteROI(id) {
-  const idx = state.rois.findIndex(r => r.id === id);
-  if (idx === -1) return;
-  const roi = state.rois[idx];
-  removeROISVG(roi);
-  state.rois.splice(idx, 1);
-  if (state.calibROI === id) state.calibROI = null;
-  if (state.activeROI === id) {
-    state.activeROI = state.rois.length > 0 ? state.rois[state.rois.length - 1].id : null;
-  }
-  renderROIList();
-  renderAllROIs();
-}
-
-modalRenameCancel.addEventListener('click', () => closeModal(modalRename));
-modalRenameOk.addEventListener('click', () => {
-  const id = modalRenameOk.dataset.roiId;
-  const roi = state.rois.find(r => r.id === id);
-  if (roi) {
-    roi.name = inputRename.value.trim() || roi.name;
-    renderROIList();
-    renderAllROIs();
-  }
-  closeModal(modalRename);
-});
-
-// ═══════════════════════════════════════════════════════
-// TOOL BUTTONS
-// ═══════════════════════════════════════════════════════
-toolSelect.addEventListener('click', () => setMode('select'));
-
-toolCircle.addEventListener('click', () => {
-  if (!state.image) return;
-  setMode('circle');
-});
-
-toolPolygon.addEventListener('click', () => {
-  if (!state.image) return;
-  if (state.mode === 'polygon' && state.polyPoints.length >= 3) {
-    // Double-tap the button closes the polygon
-    closePolygon();
-    return;
-  }
-  setMode('polygon');
-  if (!pendingPolyName) startPolygonCreation();
-});
-
-// Double tap on polygon tool = close polygon
-let polyBtnTapTime = 0;
-toolPolygon.addEventListener('touchend', e => {
-  const now = Date.now();
-  if (now - polyBtnTapTime < 400 && state.polyPoints.length >= 3) {
-    closePolygon();
-    e.preventDefault();
-  }
-  polyBtnTapTime = now;
-});
-
-// Also: tap on first polygon point to close
-canvasWrap.addEventListener('touchend', e => {
-  if (state.mode !== 'polygon' || state.polyPoints.length < 3) return;
-  if (tapMoved) return;
-  const t = e.changedTouches[0];
-  const pt = clientToSVG(t.clientX, t.clientY);
-  const first = state.polyPoints[0];
-  const dist = Math.sqrt(Math.pow(pt.x - first.x, 2) + Math.pow(pt.y - first.y, 2));
-  // Close threshold in px on screen
-  const rect = canvasWrap.getBoundingClientRect();
-  const pxPerSvg = rect.width / state.viewBox.w;
-  const screenDist = dist * pxPerSvg;
-  if (screenDist < 24) {
-    closePolygon();
-  }
-}, { passive: true });
-
-// ═══════════════════════════════════════════════════════
+// ════════════════════════════════════════════════
 // JSON EXPORT
-// ═══════════════════════════════════════════════════════
-function angleOfSegment(p1, p2) {
-  const dx = p2.x - p1.x;
-  const dy = p2.y - p1.y;
-  let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-  if (angle < 0) angle += 360;
-  return Math.round(angle * 10) / 10;
+// ════════════════════════════════════════════════
+function edgeAngle(a, b) {
+  let deg = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+  if (deg < 0) deg += 360;
+  return Math.round(deg * 10) / 10;
 }
+function r2(v) { return Math.round(v * 100) / 100; }
 
 btnExport.addEventListener('click', () => {
-  const u = state.unitPerPx || 1;
-  const hasCalib = !!state.unitPerPx;
+  const u = S.unitPerPx || 1;
+  const cal = !!S.unitPerPx;
 
-  const exportData = {
+  const data = {
     meta: {
-      tool: 'WorldMapper v1.0',
+      tool: 'WorldMapper v2.0',
       exportedAt: new Date().toISOString(),
-      imageSize: state.image ? { width: state.image.width, height: state.image.height } : null,
-      calibrated: hasCalib,
-      unitPerPx: state.unitPerPx ?? null,
+      imageSize: S.img ? { width: S.img.w, height: S.img.h } : null,
+      calibrated: cal,
+      unitPerPx: S.unitPerPx ?? null,
       coordinateOrigin: 'top-left',
     },
-    rois: state.rois.map(roi => {
-      const base = {
-        id: roi.id,
-        name: roi.name,
-        type: roi.type,
-        isCalibrationROI: roi.isCalib || false,
-      };
-
+    rois: S.rois.map(roi => {
+      const base = { id: roi.id, name: roi.name, type: roi.type, isCalibrationROI: !!roi.isCalib };
       if (roi.type === 'circle') {
-        const g = roi.geometry;
+        const g = roi.geo;
         return {
           ...base,
-          pixels: {
-            cx: Math.round(g.cx * 100) / 100,
-            cy: Math.round(g.cy * 100) / 100,
-            r: Math.round(g.r * 100) / 100,
-          },
-          units: hasCalib ? {
-            cx: Math.round(g.cx * u * 100) / 100,
-            cy: Math.round(g.cy * u * 100) / 100,
-            r: Math.round(g.r * u * 100) / 100,
-          } : null,
+          pixels: { cx: r2(g.cx), cy: r2(g.cy), r: r2(g.r) },
+          units: cal ? { cx: r2(g.cx*u), cy: r2(g.cy*u), r: r2(g.r*u) } : null,
         };
-      } else if (roi.type === 'polygon') {
-        const pts = roi.geometry.points;
+      } else {
+        const pts = roi.geo.points;
         const edges = pts.map((p, i) => {
-          const next = pts[(i + 1) % pts.length];
-          const dx = next.x - p.x;
-          const dy = next.y - p.y;
-          const lenPx = Math.sqrt(dx*dx + dy*dy);
+          const n = pts[(i+1) % pts.length];
+          const lenPx = Math.hypot(n.x-p.x, n.y-p.y);
           return {
-            from: i,
-            to: (i + 1) % pts.length,
-            lengthPx: Math.round(lenPx * 100) / 100,
-            lengthUnits: hasCalib ? Math.round(lenPx * u * 100) / 100 : null,
-            angleDeg: angleOfSegment(p, next),
+            from: i, to: (i+1) % pts.length,
+            lengthPx: r2(lenPx),
+            lengthUnits: cal ? r2(lenPx*u) : null,
+            angleDeg: edgeAngle(p, n),
           };
         });
-
         return {
           ...base,
-          pixels: {
-            points: pts.map(p => ({
-              x: Math.round(p.x * 100) / 100,
-              y: Math.round(p.y * 100) / 100,
-            })),
-          },
-          units: hasCalib ? {
-            points: pts.map(p => ({
-              x: Math.round(p.x * u * 100) / 100,
-              y: Math.round(p.y * u * 100) / 100,
-            })),
-          } : null,
+          pixels: { points: pts.map(p => ({ x: r2(p.x), y: r2(p.y) })) },
+          units: cal ? { points: pts.map(p => ({ x: r2(p.x*u), y: r2(p.y*u) })) } : null,
           edges,
         };
       }
-      return base;
     }),
   };
 
-  const json = JSON.stringify(exportData, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -1650,29 +1233,13 @@ btnExport.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-// ═══════════════════════════════════════════════════════
-// POLYGON CREATION — start via toolbar
-// (modal name callback connects to pending poly)
-// ═══════════════════════════════════════════════════════
-// patch modalNameOk to handle polygon correctly
-const _origNameOk = modalNameOk.onclick;
-modalNameOk.addEventListener('click', () => {
-  if (pendingRoiType === 'polygon') {
-    pendingPolyName = inputRoiName.value.trim() || ('Polygon_' + (roiCounter + 1));
-    closeModal(modalName);
-    pendingRoiType = null;
-    setMode('polygon');
-  }
-});
-
-// ═══════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════
-setMode('select');
-updateStatus();
-
-// Prevent default context menu on long press
+// ════════════════════════════════════════════════
+// PREVENT CONTEXT MENU
+// ════════════════════════════════════════════════
 document.addEventListener('contextmenu', e => e.preventDefault());
+
+// INIT
+updateStatus(); updateToolbar();
 </script>
 
 </body>
