@@ -142,7 +142,7 @@ padding-top: 110px; /* below header+toolbar+status */
 }
 #roi-panel.open { display: flex; }
 #roi-panel-inner {
-background: #1c2030;
+background: #1c2030f5;
 border: 1px solid var(–border);
 border-radius: 0 0 8px 8px;
 width: 100%;
@@ -163,7 +163,7 @@ cursor: pointer;
 .rpname {
 font-family: ‘Share Tech Mono’, monospace;
 font-size: 12px; flex: 1;
-color: var(–text);
+color: var(#ffffff);
 overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .rpitem.active .rpname { color: var(–accent); }
@@ -602,14 +602,19 @@ wrap.addEventListener('touchmove', e => {
   }
 }, { passive: false });
 
+let _lastTapTime = 0;
 wrap.addEventListener('touchend', e => {
   if (e.touches.length < 2) lastPinchDist = 0;
   if (e.touches.length === 0) {
     const moved = S.pan?.moved;
     S.pan = null;
-    if (!moved && !S.drag) handleTap(e.changedTouches[0]);
+    if (!moved && !S.drag) {
+      _lastTapTime = Date.now();
+      handleTap(e.changedTouches[0]);
+    }
   }
 });
+
 
 wrap.addEventListener('wheel', e => {
   e.preventDefault();
@@ -642,8 +647,11 @@ document.addEventListener('mouseup', e => {
   if (!mousePan) return;
   const moved = mousePan.moved;
   mousePan = null;
-  if (!moved) handleTap({ clientX: e.clientX, clientY: e.clientY });
+  if (!moved && Date.now() - _lastTapTime > 300) {
+    handleTap({ clientX: e.clientX, clientY: e.clientY });
+  }
 });
+
 
 // ════════════════════════════════════════════════
 // TAP HANDLER (canvas tap — no handle, no panel)
