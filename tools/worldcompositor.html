@@ -732,7 +732,7 @@ function buildRoiSvg(roi) {
   if (roi.type === 'circle') {
     const c = mk('circle', {
       cx: roi.geo.cx, cy: roi.geo.cy, r: roi.geo.r,
-      fill: color + (isActive ? '55' : '28'),
+      fill: color + (isActive ? '70' : '55'),
       stroke: isMergeSelected ? '#ff4757' : color,
       'stroke-width': isActive ? 2.5 : 1,
       opacity: isActive ? 1 : 0.6,
@@ -756,7 +756,7 @@ function buildRoiSvg(roi) {
   } else {
     const poly = mk('polygon', {
       points: roi.geo.points.map(p => `${p.x},${p.y}`).join(' '),
-      fill: color + (isActive ? '55' : '28'),
+      fill: color + (isActive ? '70' : '55'),
       stroke: isMergeSelected ? '#ff4757' : color,
       'stroke-width': isActive ? 2.5 : 1,
       opacity: isActive ? 1 : 0.6,
