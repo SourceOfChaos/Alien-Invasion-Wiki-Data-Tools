@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WorldCompositor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@300;400;500;600&display=swap');
+
+:root {
+–bg:     #0a0c10;
+–surf:   #12151e;
+–surf2:  #1a1f2e;
+–border: #2a3350;
+–text:   #d0d8f0;
+–dim:    #4a5580;
+–accent: #e8ff47;
+–cyan:   #47ffe8;
+–danger: #ff4757;
+–snap:   #ff9f43;
+}
+
+- { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+background: var(–bg);
+color: var(–text);
+font-family: ‘Outfit’, sans-serif;
+height: 100dvh;
+display: flex;
+flex-direction: column;
+overflow: hidden;
+user-select: none;
+-webkit-user-select: none;
+}
+
+header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 8px 12px;
+background: var(–surf);
+border-bottom: 1px solid var(–border);
+flex-shrink: 0;
+gap: 8px;
+}
+.logo { font-family: ‘Share Tech Mono’, monospace; font-size: 12px; color: var(–cyan); letter-spacing: 2px; }
+.hbtns { display: flex; gap: 5px; }
+
+.toolbar {
+display: flex; align-items: center; gap: 5px;
+padding: 6px 12px;
+background: var(–surf);
+border-bottom: 1px solid var(–border);
+flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
+}
+.toolbar::-webkit-scrollbar { display: none; }
+.tsep { width: 1px; height: 18px; background: var(–border); flex-shrink: 0; }
+
+.btn {
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 10px; letter-spacing: 1px;
+padding: 6px 10px;
+border: 1px solid var(–border);
+background: var(–surf2); color: var(–text);
+border-radius: 4px; cursor: pointer;
+white-space: nowrap; flex-shrink: 0;
+transition: opacity .1s;
+}
+.btn:active { opacity: .7; }
+.btn.on    { background: var(–accent); color: #0a0c10; border-color: var(–accent); }
+.btn.cyan  { border-color: var(–cyan); color: var(–cyan); }
+.btn.snap  { border-color: var(–snap); color: var(–snap); }
+.btn.snap.on { background: var(–snap); color: #0a0c10; }
+.btn.danger { border-color: var(–danger); color: var(–danger); }
+.btn.exp   { border-color: var(–accent); color: var(–accent); }
+.btn[disabled] { opacity: .3; pointer-events: none; }
+
+.statusbar {
+display: flex; gap: 10px; padding: 4px 12px;
+background: var(–bg); border-bottom: 1px solid var(–border);
+flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
+}
+.statusbar::-webkit-scrollbar { display: none; }
+.chip { font-family: ‘Share Tech Mono’, monospace; font-size: 10px; color: var(–dim); white-space: nowrap; }
+.chip b { color: var(–cyan); font-weight: 400; }
+
+#wrap {
+flex: 1; position: relative; overflow: hidden;
+background: #0a0c10; touch-action: none;
+}
+#wrap::before {
+content: ‘’;
+position: absolute; inset: 0;
+background-image:
+linear-gradient(#1a1f2e 1px, transparent 1px),
+linear-gradient(90deg, #1a1f2e 1px, transparent 1px);
+background-size: 60px 60px;
+opacity: .35; pointer-events: none;
+}
+#svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+/* snap dot */
+#snap-dot {
+display: none; position: absolute;
+width: 18px; height: 18px; border-radius: 50%;
+background: var(–snap); opacity: .85;
+pointer-events: none;
+transform: translate(-50%,-50%);
+z-index: 30;
+}
+
+/* panels */
+.panel-overlay {
+display: none; position: fixed; inset: 0;
+z-index: 50; background: #000b;
+}
+.panel-overlay.open { display: block; }
+.panel-inner {
+background: var(–surf);
+border: 1px solid var(–border);
+border-top: none;
+border-radius: 0 0 8px 8px;
+width: 100%; max-height: 60vh;
+overflow-y: auto; margin-top: 96px;
+}
+
+.pitem {
+display: flex; align-items: center; gap: 8px;
+padding: 10px 14px; border-bottom: 1px solid var(–border);
+cursor: pointer;
+}
+.pitem:last-child { border-bottom: none; }
+.pitem:active { background: var(–surf2); }
+.pitem.active { background: #47ffe818; }
+.pdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pname { font-family: ‘Share Tech Mono’, monospace; font-size: 12px; color: #fff; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pitem.active .pname { color: var(–cyan); }
+.pbadge { font-family: ‘Share Tech Mono’, monospace; font-size: 9px; padding: 2px 5px; border-radius: 3px; flex-shrink: 0; border: 1px solid; }
+.pdel { font-size: 14px; color: var(–dim); padding: 2px 8px; flex-shrink: 0; }
+.pempty { padding: 16px; font-family: ‘Share Tech Mono’, monospace; font-size: 11px; color: var(–dim); text-align: center; }
+
+/* prop panel */
+#prop-panel {
+position: absolute; bottom: 0; left: 0; right: 0;
+background: var(–surf); border-top: 1px solid var(–border);
+padding: 10px 14px; z-index: 20; display: none;
+}
+#prop-panel.open { display: block; }
+.prop-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.prop-name { font-family: ‘Share Tech Mono’, monospace; font-size: 12px; color: var(–accent); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-pill { font-family: ‘Share Tech Mono’, monospace; font-size: 9px; padding: 3px 7px; border-radius: 3px; cursor: pointer; border: 1px solid currentColor; }
+
+/* floating layer/group panel */
+.float-panel {
+display: none; position: fixed;
+bottom: 65px; left: 12px; right: 12px;
+background: var(–surf); border: 1px solid var(–border);
+border-radius: 8px; z-index: 60;
+max-height: 40vh; overflow-y: auto;
+}
+.float-panel.open { display: block; }
+
+.layer-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(–border); cursor: pointer; }
+.layer-item:last-child { border-bottom: none; }
+.layer-item:active { background: var(–surf2); }
+.layer-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.layer-name { font-family: ‘Share Tech Mono’, monospace; font-size: 12px; color: #fff; }
+
+/* empty state */
+#empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none; }
+.eico { font-size: 40px; opacity: .2; }
+.etxt { font-family: ‘Share Tech Mono’, monospace; font-size: 11px; color: var(–dim); text-align: center; line-height: 2; letter-spacing: 1px; }
+
+/* modals */
+.modal-bg { display: none; position: fixed; inset: 0; background: #000c; z-index: 200; align-items: center; justify-content: center; padding: 16px; }
+.modal-bg.open { display: flex; }
+.modal { background: var(–surf); border: 1px solid var(–border); border-radius: 10px; padding: 18px; width: 100%; max-width: 320px; }
+.mtitle { font-family: ‘Share Tech Mono’, monospace; font-size: 12px; color: var(–cyan); letter-spacing: 2px; margin-bottom: 14px; }
+.flabel { font-family: ‘Share Tech Mono’, monospace; font-size: 10px; color: var(–dim); letter-spacing: 1px; margin-bottom: 5px; }
+.finput { width: 100%; background: var(–bg); border: 1px solid var(–border); color: var(–text); font-family: ‘Share Tech Mono’, monospace; font-size: 13px; padding: 9px 11px; border-radius: 4px; outline: none; margin-bottom: 10px; }
+.finput:focus { border-color: var(–cyan); }
+.fhint { font-size: 10px; color: var(–dim); margin-top: -6px; margin-bottom: 10px; line-height: 1.5; }
+.mbtns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+</style>
+
+</head>
+<body>
+
+<header>
+  <div class="logo">◈ WORLDCOMPOSITOR</div>
+  <div class="hbtns">
+    <button class="btn cyan" id="btn-load">＋ JSON</button>
+    <button class="btn exp" id="btn-export" disabled>⬇ EXPORT</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <button class="btn" id="btn-rois">☰ ROIs <span id="roi-count"></span></button>
+  <div class="tsep"></div>
+  <button class="btn" id="btn-addpt" style="display:none">＋ PUNKT</button>
+  <button class="btn danger" id="btn-merge" style="display:none">⊕ MERGE</button>
+  <button class="btn danger" id="btn-merge-confirm" style="display:none">✓ MERGE AUSFÜHREN</button>
+  <button class="btn" id="btn-merge-cancel-mode" style="display:none">✕ ABBRUCH</button>
+  <div class="tsep"></div>
+  <button class="btn snap on" id="btn-snap">⊡ SNAP</button>
+  <div class="tsep"></div>
+  <button class="btn" id="btn-layers">LAYER ▾</button>
+</div>
+
+<div class="statusbar">
+  <div class="chip">ROIs <b id="sc-total">0</b></div>
+  <div class="chip">AKTIV <b id="sc-active">—</b></div>
+  <div class="chip">LAYER <b id="sc-layer">—</b></div>
+  <div class="chip">GRP <b id="sc-group">—</b></div>
+</div>
+
+<div id="wrap">
+  <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+    <g id="l-rois"></g>
+    <g id="l-handles"></g>
+  </svg>
+  <div id="empty">
+    <div class="eico">🗺</div>
+    <div class="etxt">JSON LADEN<br>→ LAYER ZUWEISEN<br>→ GRUPPEN BILDEN<br>→ MERGEN & ANPASSEN<br>→ EXPORTIEREN</div>
+  </div>
+  <div id="snap-dot"></div>
+</div>
+
+<!-- ROI prop panel -->
+
+<div id="prop-panel">
+  <div class="prop-row">
+    <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim)">ROI:</span>
+    <span class="prop-name" id="prop-name">—</span>
+    <span class="layer-pill" id="prop-layer-pill" style="display:none" onclick="toggleLayerPanel()"></span>
+    <button class="btn" style="padding:4px 8px;font-size:9px" id="prop-rename-btn">✎</button>
+    <button class="btn" style="padding:4px 8px;font-size:9px" id="prop-group-btn">⊞ GRP</button>
+    <button class="btn danger" style="padding:4px 8px;font-size:9px" id="prop-del-btn">✕</button>
+  </div>
+</div>
+
+<!-- ROI List -->
+
+<div class="panel-overlay" id="roi-panel">
+  <div class="panel-inner" id="roi-panel-inner"></div>
+</div>
+
+<!-- Layer visibility panel -->
+
+<div class="panel-overlay" id="layer-vis-panel">
+  <div class="panel-inner" id="layer-vis-inner"></div>
+</div>
+
+<!-- Layer selector (floating) -->
+
+<div class="float-panel" id="layer-sel-panel"></div>
+
+<!-- File input -->
+
+<input type="file" id="finput" accept=".json,application/json" multiple style="display:none">
+
+<!-- Modal rename -->
+
+<div class="modal-bg" id="m-rename">
+  <div class="modal">
+    <div class="mtitle">UMBENENNEN</div>
+    <div class="flabel">NAME</div>
+    <input class="finput" id="m-rename-input" type="text" autocomplete="off">
+    <div class="mbtns">
+      <button class="btn" id="m-rename-cancel">ABBRUCH</button>
+      <button class="btn on" id="m-rename-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal group -->
+
+<div class="modal-bg" id="m-group">
+  <div class="modal">
+    <div class="mtitle">GRUPPE ZUWEISEN</div>
+    <div class="flabel">GRUPPENNAME (leer = keine Gruppe)</div>
+    <input class="finput" id="m-group-input" type="text" autocomplete="off" placeholder="z.B. Kustov_Block">
+    <div class="fhint">Alle ROIs einer Gruppe verschieben sich gemeinsam.<br>Wird im Export gespeichert.</div>
+    <div class="mbtns">
+      <button class="btn" id="m-group-cancel">ABBRUCH</button>
+      <button class="btn on" id="m-group-ok">ZUWEISEN</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal merge -->
+
+<div class="modal-bg" id="m-merge">
+  <div class="modal">
+    <div class="mtitle">POLYGONE MERGEN</div>
+    <div id="m-merge-info" style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:12px;line-height:1.7"></div>
+    <div class="flabel">NAME DES ERGEBNIS-POLYGONS</div>
+    <input class="finput" id="m-merge-name" type="text" autocomplete="off">
+    <div class="mbtns">
+      <button class="btn" id="m-merge-cancel">ABBRUCH</button>
+      <button class="btn on" id="m-merge-ok">MERGEN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════
+// LAYER DEFINITIONS — add layers here
+// ═══════════════════════════════════════
+const LAYERS = [
+  { id: 'room',    label: 'Room',         color: '#47ffe8' },
+  { id: 'gate',    label: 'Gate',         color: '#e8ff47' },
+  { id: 'wall',    label: 'Wall',         color: '#778ca3' },
+  { id: 'spawn',   label: 'Spawn Point',  color: '#ff6b81' },
+  { id: 'farm',    label: 'Farm',         color: '#55efc4' },
+  { id: 'market',  label: 'Market',       color: '#fdcb6e' },
+  { id: 'mission', label: 'Mission Spot', color: '#a29bfe' },
+  { id: 'none',    label: 'Kein Layer',   color: '#74b9ff' },
+];
+function layerById(id) { return LAYERS.find(l => l.id === id) || LAYERS[LAYERS.length-1]; }
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+const S = {
+  rois: [],
+  activeId: null,
+  snapOn: true,
+  mergeMode: false,
+  mergeIds: [],
+  vb: { x: -500, y: -500, w: 5000, h: 8000 },
+  drag: false,
+  _seq: 0,
+  layerVis: {},
+};
+LAYERS.forEach(l => { S.layerVis[l.id] = true; });
+
+const SNAP_R = 40;   // SVG units snap radius
+const HR = 16;        // handle radius (SVG units, scales with zoom)
+const HANDLE_PX = 28; // minimum screen px for handle hitbox
+
+const NS = 'http://www.w3.org/2000/svg';
+const wrap    = document.getElementById('wrap');
+const svgEl   = document.getElementById('svg');
+const lRois   = document.getElementById('l-rois');
+const lHnd    = document.getElementById('l-handles');
+const emptyEl = document.getElementById('empty');
+const snapDot = document.getElementById('snap-dot');
+
+function uid() { return 'r'+(++S._seq); }
+function mk(tag, attrs) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+function getRoi(id) { return S.rois.find(r => r.id === id); }
+function clientToSvg(cx, cy) {
+  const rect = wrap.getBoundingClientRect();
+  return { x: S.vb.x + (cx-rect.left)/rect.width*S.vb.w, y: S.vb.y + (cy-rect.top)/rect.height*S.vb.h };
+}
+function svgUnitToPx() {
+  // How many px is 1 SVG unit currently
+  return wrap.getBoundingClientRect().width / S.vb.w;
+}
+function applyVB() { svgEl.setAttribute('viewBox', `${S.vb.x} ${S.vb.y} ${S.vb.w} ${S.vb.h}`); }
+function openModal(m) { m.classList.add('open'); setTimeout(()=>m.querySelector('input')?.focus(),80); }
+function closeModal(m) { m.classList.remove('open'); }
+function closeAllPanels() {
+  ['roi-panel','layer-vis-panel'].forEach(id => document.getElementById(id).classList.remove('open'));
+  document.getElementById('layer-sel-panel').classList.remove('open');
+}
+
+// ═══════════════════════════════════════
+// IMPORT
+// ═══════════════════════════════════════
+document.getElementById('btn-load').addEventListener('click', () => document.getElementById('finput').click());
+document.getElementById('finput').addEventListener('change', e => {
+  Array.from(e.target.files).forEach(f => {
+    const r = new FileReader();
+    r.onload = ev => { try { importJSON(JSON.parse(ev.target.result)); } catch(err) { alert('JSON-Fehler: '+err.message); } };
+    r.readAsText(f);
+  });
+  e.target.value = '';
+});
+
+function importJSON(data) {
+  const rois = data.rois || [];
+  const uPx = data.meta?.unitPerPx || 1;
+
+  // Auto offset: place new batch right of existing
+  let offsetX = 0;
+  if (S.rois.length) {
+    let maxX = -Infinity;
+    S.rois.forEach(roi => {
+      if (roi.type === 'circle') maxX = Math.max(maxX, roi.geo.cx + roi.geo.r);
+      else roi.geo.points.forEach(p => { maxX = Math.max(maxX, p.x); });
+    });
+    offsetX = maxX + 300;
+  }
+
+  rois.forEach(r => {
+    if (r.isCalibrationROI) return;
+    let geo, type;
+    if (r.type === 'circle') {
+      const u = r.units || { cx: r.pixels.cx*uPx, cy: r.pixels.cy*uPx, r: r.pixels.r*uPx };
+      type = 'circle';
+      geo = { cx: u.cx+offsetX, cy: u.cy, r: u.r };
+    } else {
+      const u = r.units || { points: r.pixels.points.map(p=>({x:p.x*uPx,y:p.y*uPx})) };
+      type = 'polygon';
+      const pts = dedupPts(u.points.map(p=>({x:p.x+offsetX,y:p.y})));
+      geo = { points: pts };
+    }
+    const roi = { id: uid(), name: r.name||('ROI_'+S._seq), type, layer: r.layer||'none', group: r.group||'', geo, svgG: null };
+    S.rois.push(roi);
+    buildRoiSvg(roi);
+  });
+
+  fitView(); updateAll();
+  document.getElementById('btn-export').disabled = false;
+  emptyEl.style.display = 'none';
+}
+
+function dedupPts(pts) {
+  if (!pts.length) return pts;
+  const out = [pts[0]];
+  for (let i=1;i<pts.length;i++) {
+    if (Math.hypot(pts[i].x-out[out.length-1].x, pts[i].y-out[out.length-1].y) > 1) out.push(pts[i]);
+  }
+  return out;
+}
+
+function fitView() {
+  if (!S.rois.length) return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  S.rois.forEach(roi => {
+    if (roi.type==='circle') { x0=Math.min(x0,roi.geo.cx-roi.geo.r); y0=Math.min(y0,roi.geo.cy-roi.geo.r); x1=Math.max(x1,roi.geo.cx+roi.geo.r); y1=Math.max(y1,roi.geo.cy+roi.geo.r); }
+    else roi.geo.points.forEach(p=>{ x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y); });
+  });
+  const pad=300;
+  S.vb.x=x0-pad; S.vb.y=y0-pad; S.vb.w=(x1-x0)+pad*2; S.vb.h=(y1-y0)+pad*2;
+  applyVB();
+}
+
+// ═══════════════════════════════════════
+// BUILD ROI SVG
+// ═══════════════════════════════════════
+function buildRoiSvg(roi) {
+  if (roi.svgG) roi.svgG.remove();
+  lHnd.querySelectorAll(`[data-hroi="${roi.id}"]`).forEach(e=>e.remove());
+
+  const isActive = roi.id === S.activeId;
+  const isMSel   = S.mergeIds.includes(roi.id);
+  const layer    = layerById(roi.layer);
+  const color    = layer.color;
+  const vis      = S.layerVis[roi.layer] !== false;
+
+  const g = document.createElementNS(NS,'g');
+  g.dataset.roiId = roi.id;
+  if (!vis) g.style.display = 'none';
+
+  if (roi.type === 'circle') {
+    g.appendChild(mk('circle', {
+      cx:roi.geo.cx, cy:roi.geo.cy, r:roi.geo.r,
+      fill: color+(isActive?'50':'28'),
+      stroke: isMSel?'#ff4757':color,
+      'stroke-width': isActive?2.5:1,
+      opacity: isActive?1:0.7,
+      'pointer-events':'none',
+    }));
+    const lbl = mk('text',{ x:roi.geo.cx, y:roi.geo.cy, 'text-anchor':'middle','dominant-baseline':'middle', fill:'#000000', 'font-family':'Share Tech Mono,monospace','font-size':Math.max(14,roi.geo.r*0.12),'pointer-events':'none',opacity:0.85,'font-weight':'600' });
+    lbl.textContent = roi.name; g.appendChild(lbl);
+  } else {
+    g.appendChild(mk('polygon',{
+      points:roi.geo.points.map(p=>`${p.x},${p.y}`).join(' '),
+      fill:color+(isActive?'50':'28'),
+      stroke:isMSel?'#ff4757':color,
+      'stroke-width':isActive?2.5:1,
+      opacity:isActive?1:0.7,
+      'pointer-events':'none',
+    }));
+    const cx = roi.geo.points.reduce((s,p)=>s+p.x,0)/roi.geo.points.length;
+    const cy = roi.geo.points.reduce((s,p)=>s+p.y,0)/roi.geo.points.length;
+    const lbl = mk('text',{ x:cx,y:cy,'text-anchor':'middle','dominant-baseline':'middle',fill:'#000000','font-family':'Share Tech Mono,monospace','font-size':18,'pointer-events':'none',opacity:0.85,'font-weight':'600' });
+    lbl.textContent = roi.name; g.appendChild(lbl);
+  }
+
+  lRois.appendChild(g);
+  roi.svgG = g;
+  if (isActive) buildHandles(roi);
+}
+
+function handleR() {
+  // Dynamic handle radius: always at least HANDLE_PX on screen
+  const minSvg = HANDLE_PX / svgUnitToPx();
+  return Math.max(HR, minSvg);
+}
+
+function buildHandles(roi) {
+  lHnd.querySelectorAll(`[data-hroi="${roi.id}"]`).forEach(e=>e.remove());
+  const color = layerById(roi.layer).color;
+  const hr = handleR();
+
+  if (roi.type === 'circle') {
+    // Center (move whole ROI / group)
+    const ch = mk('circle',{ cx:roi.geo.cx,cy:roi.geo.cy,r:hr, fill:color,stroke:'#0a0c10','stroke-width':2,cursor:'move' });
+    ch.dataset.hroi=roi.id; ch.dataset.ht='cc';
+    lHnd.appendChild(ch);
+    attachDrag(ch, roi, (roi,cur,sg,dx,dy) => moveRoiOrGroup(roi,sg,dx,dy));
+
+    // Radius handle (east)
+    const rh = mk('rect',{ x:roi.geo.cx+roi.geo.r-hr,y:roi.geo.cy-hr,width:hr*2,height:hr*2, fill:color,stroke:'#0a0c10','stroke-width':2,rx:3,cursor:'ew-resize' });
+    rh.dataset.hroi=roi.id; rh.dataset.ht='cr';
+    lHnd.appendChild(rh);
+    attachDrag(rh, roi, (roi,cur) => { roi.geo.r = Math.max(5, Math.hypot(cur.x-roi.geo.cx, cur.y-roi.geo.cy)); });
+
+  } else {
+    // Center-of-mass move handle (★ new: move whole polygon)
+    const cx = roi.geo.points.reduce((s,p)=>s+p.x,0)/roi.geo.points.length;
+    const cy = roi.geo.points.reduce((s,p)=>s+p.y,0)/roi.geo.points.length;
+    const mh = mk('rect',{ x:cx-hr,y:cy-hr,width:hr*2,height:hr*2, fill:color,stroke:'#0a0c10','stroke-width':2,rx:3,cursor:'move',opacity:0.9 });
+    mh.dataset.hroi=roi.id; mh.dataset.ht='pm';
+    lHnd.appendChild(mh);
+    attachDrag(mh, roi, (roi,cur,sg,dx,dy) => moveRoiOrGroup(roi,sg,dx,dy));
+
+    // Vertex handles
+    roi.geo.points.forEach((p,i) => {
+      const h = mk('circle',{ cx:p.x,cy:p.y,r:hr, fill:color,stroke:'#0a0c10','stroke-width':2,cursor:'move' });
+      h.dataset.hroi=roi.id; h.dataset.ht='pv'; h.dataset.hi=i;
+      lHnd.appendChild(h);
+      attachDrag(h, roi, (roi,cur,sg,dx,dy) => {
+        let tx=sg.points[i].x+dx, ty=sg.points[i].y+dy;
+        if (S.snapOn) { const sn=findSnap(tx,ty,roi.id); if(sn){tx=sn.x;ty=sn.y;showSnap(tx,ty);}else hideSnap(); }
+        roi.geo.points[i].x=tx; roi.geo.points[i].y=ty;
+      });
+      // Long press = delete
+      let lpt=null;
+      h.addEventListener('touchstart',()=>{ lpt=setTimeout(()=>{ if(roi.geo.points.length>3){roi.geo.points.splice(i,1);buildRoiSvg(roi);}},600); },{passive:true});
+      ['touchend','touchmove'].forEach(ev=>h.addEventListener(ev,()=>clearTimeout(lpt)));
+    });
+  }
+}
+
+// Move ROI or whole group
+function moveRoiOrGroup(roi, startGeo, dx, dy) {
+  if (roi.group) {
+    S.rois.filter(r=>r.group===roi.group).forEach(r => {
+      const sg = startGeo.groupSnap[r.id];
+      if (!sg) return;
+      applyOffset(r, sg, dx, dy);
+    });
+  } else {
+    applyOffset(roi, startGeo, dx, dy);
+  }
+}
+
+function applyOffset(roi, sg, dx, dy) {
+  if (roi.type==='circle') { roi.geo.cx=sg.cx+dx; roi.geo.cy=sg.cy+dy; }
+  else roi.geo.points.forEach((p,i)=>{ p.x=sg.points[i].x+dx; p.y=sg.points[i].y+dy; });
+}
+
+// ═══════════════════════════════════════
+// SYNC SVG (fast path during drag)
+// ═══════════════════════════════════════
+function syncSvg(roi) {
+  if (!roi.svgG) return;
+  const hr = handleR();
+  if (roi.type==='circle') {
+    const c=roi.svgG.querySelector('circle'); if(c){c.setAttribute('cx',roi.geo.cx);c.setAttribute('cy',roi.geo.cy);c.setAttribute('r',roi.geo.r);}
+    const t=roi.svgG.querySelector('text'); if(t){t.setAttribute('x',roi.geo.cx);t.setAttribute('y',roi.geo.cy);}
+    const ch=lHnd.querySelector(`[data-ht="cc"][data-hroi="${roi.id}"]`); if(ch){ch.setAttribute('cx',roi.geo.cx);ch.setAttribute('cy',roi.geo.cy);}
+    const rh=lHnd.querySelector(`[data-ht="cr"][data-hroi="${roi.id}"]`); if(rh){rh.setAttribute('x',roi.geo.cx+roi.geo.r-hr);rh.setAttribute('y',roi.geo.cy-hr);}
+  } else {
+    const po=roi.svgG.querySelector('polygon'); if(po) po.setAttribute('points',roi.geo.points.map(p=>`${p.x},${p.y}`).join(' '));
+    const cx=roi.geo.points.reduce((s,p)=>s+p.x,0)/roi.geo.points.length;
+    const cy=roi.geo.points.reduce((s,p)=>s+p.y,0)/roi.geo.points.length;
+    const t=roi.svgG.querySelector('text'); if(t){t.setAttribute('x',cx);t.setAttribute('y',cy);}
+    const mh=lHnd.querySelector(`[data-ht="pm"][data-hroi="${roi.id}"]`); if(mh){mh.setAttribute('x',cx-hr);mh.setAttribute('y',cy-hr);}
+    lHnd.querySelectorAll(`[data-ht="pv"][data-hroi="${roi.id}"]`).forEach((h,i)=>{ if(roi.geo.points[i]){h.setAttribute('cx',roi.geo.points[i].x);h.setAttribute('cy',roi.geo.points[i].y);} });
+  }
+}
+
+function syncGroup(roi) {
+  syncSvg(roi);
+  if (roi.group) S.rois.filter(r=>r.group===roi.group&&r.id!==roi.id).forEach(r=>syncSvg(r));
+}
+
+// ═══════════════════════════════════════
+// SNAP
+// ═══════════════════════════════════════
+function allPts(excId) {
+  const pts=[];
+  S.rois.forEach(r=>{ if(r.id===excId)return; if(r.type==='circle') pts.push({x:r.geo.cx,y:r.geo.cy}); else r.geo.points.forEach(p=>pts.push({x:p.x,y:p.y})); });
+  return pts;
+}
+function allEdges(excId) {
+  const ed=[];
+  S.rois.forEach(r=>{ if(r.id===excId||r.type!=='polygon')return; r.geo.points.forEach((p,i)=>ed.push({a:p,b:r.geo.points[(i+1)%r.geo.points.length]})); });
+  return ed;
+}
+function projSeg(p,a,b) {
+  const dx=b.x-a.x,dy=b.y-a.y,len2=dx*dx+dy*dy;
+  if(!len2)return null;
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/len2));
+  return {x:a.x+t*dx,y:a.y+t*dy};
+}
+function findSnap(x,y,excId) {
+  let best=null,bd=SNAP_R;
+  allPts(excId).forEach(p=>{ const d=Math.hypot(x-p.x,y-p.y); if(d<bd){bd=d;best={x:p.x,y:p.y};} });
+  if(!best) allEdges(excId).forEach(({a,b})=>{ const pr=projSeg({x,y},a,b); if(!pr)return; const d=Math.hypot(x-pr.x,y-pr.y); if(d<bd){bd=d;best=pr;} });
+  return best;
+}
+function showSnap(sx,sy) {
+  const rect=wrap.getBoundingClientRect();
+  const px=rect.left+(sx-S.vb.x)/S.vb.w*rect.width;
+  const py=rect.top+(sy-S.vb.y)/S.vb.h*rect.height;
+  snapDot.style.display='block'; snapDot.style.left=px+'px'; snapDot.style.top=py+'px';
+}
+function hideSnap() { snapDot.style.display='none'; }
+
+// ═══════════════════════════════════════
+// HANDLE DRAG
+// ═══════════════════════════════════════
+function attachDrag(el, roi, moveFn) {
+  let ss=null, sg=null;
+
+  function begin(cx,cy) {
+    ss=clientToSvg(cx,cy);
+    // Snapshot: own geo + group geos
+    sg = JSON.parse(JSON.stringify(roi.geo));
+    if (roi.group) {
+      sg.groupSnap={};
+      S.rois.filter(r=>r.group===roi.group).forEach(r=>{ sg.groupSnap[r.id]=JSON.parse(JSON.stringify(r.geo)); });
+    } else {
+      sg.groupSnap={[roi.id]:JSON.parse(JSON.stringify(roi.geo))};
+    }
+    S.drag=true;
+  }
+  function move(cx,cy) {
+    if(!S.drag||!ss)return;
+    const cur=clientToSvg(cx,cy);
+    moveFn(roi,cur,sg,cur.x-ss.x,cur.y-ss.y);
+    syncGroup(roi);
+  }
+  function end() { S.drag=false; hideSnap(); }
+
+  el.addEventListener('touchstart',e=>{ e.stopPropagation();e.preventDefault();begin(e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+  el.addEventListener('touchmove', e=>{ e.stopPropagation();e.preventDefault();move(e.touches[0].clientX,e.touches[0].clientY); },{passive:false});
+  el.addEventListener('touchend', e=>{ e.stopPropagation();end(); });
+  el.addEventListener('mousedown',e=>{
+    e.stopPropagation();e.preventDefault();begin(e.clientX,e.clientY);
+    const mm=ev=>move(ev.clientX,ev.clientY);
+    const mu=()=>{ end();document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu); };
+    document.addEventListener('mousemove',mm); document.addEventListener('mouseup',mu);
+  });
+}
+
+// ═══════════════════════════════════════
+// ZOOM / PAN  — fixed pinch implementation
+// ═══════════════════════════════════════
+let panState=null, pinchState=null;
+let _lastTouchTap=0;
+
+wrap.addEventListener('touchstart',e=>{
+  if(S.drag)return;
+  if(e.touches.length===2){
+    // Start pinch — cancel any pan
+    panState=null;
+    pinchState={
+      dist: Math.hypot(e.touches[1].clientX-e.touches[0].clientX,e.touches[1].clientY-e.touches[0].clientY),
+      cx:(e.touches[0].clientX+e.touches[1].clientX)/2,
+      cy:(e.touches[0].clientY+e.touches[1].clientY)/2,
+      vb:{...S.vb},
+    };
+    e.preventDefault();
+    return;
+  }
+  if(e.touches.length===1){
+    pinchState=null;
+    panState={ sx:e.touches[0].clientX,sy:e.touches[0].clientY,vb:{...S.vb},moved:false };
+  }
+},{passive:false});
+
+wrap.addEventListener('touchmove',e=>{
+  if(S.drag){e.preventDefault();return;}
+  e.preventDefault();
+  if(e.touches.length===2&&pinchState){
+    const newDist=Math.hypot(e.touches[1].clientX-e.touches[0].clientX,e.touches[1].clientY-e.touches[0].clientY);
+    const newCx=(e.touches[0].clientX+e.touches[1].clientX)/2;
+    const newCy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+    const scale=pinchState.dist/newDist;
+
+    // Use the INITIAL pinch state as reference to avoid drift
+    const rect=wrap.getBoundingClientRect();
+    const pivotSvgX=pinchState.vb.x+(pinchState.cx-rect.left)/rect.width*pinchState.vb.w;
+    const pivotSvgY=pinchState.vb.y+(pinchState.cy-rect.top)/rect.height*pinchState.vb.h;
+
+    const newW=pinchState.vb.w*scale;
+    const newH=pinchState.vb.h*scale;
+    const panDx=(newCx-pinchState.cx)/rect.width*newW;
+    const panDy=(newCy-pinchState.cy)/rect.height*newH;
+
+    S.vb.w=newW; S.vb.h=newH;
+    S.vb.x=pivotSvgX-((pinchState.cx-rect.left)/rect.width)*newW - panDx;
+    S.vb.y=pivotSvgY-((pinchState.cy-rect.top)/rect.height)*newH - panDy;
+    applyVB();
+    return;
+  }
+  if(e.touches.length===1&&panState){
+    const dx=e.touches[0].clientX-panState.sx;
+    const dy=e.touches[0].clientY-panState.sy;
+    if(Math.hypot(dx,dy)>6)panState.moved=true;
+    const rect=wrap.getBoundingClientRect();
+    S.vb.x=panState.vb.x-dx/rect.width*panState.vb.w;
+    S.vb.y=panState.vb.y-dy/rect.height*panState.vb.h;
+    applyVB();
+  }
+},{passive:false});
+
+wrap.addEventListener('touchend',e=>{
+  if(e.touches.length<2) pinchState=null;
+  if(e.touches.length===0){
+    const moved=panState?.moved;
+    panState=null;
+    if(!moved&&!S.drag){
+      _lastTouchTap=Date.now();
+      if(addPtMode){ handleAddPtTap(e.changedTouches[0]); }
+    }
+  }
+});
+
+wrap.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const f=e.deltaY>0?1.1:0.9;
+  const p=clientToSvg(e.clientX,e.clientY);
+  S.vb.w*=f;S.vb.h*=f;
+  const p2=clientToSvg(e.clientX,e.clientY);
+  S.vb.x+=p.x-p2.x;S.vb.y+=p.y-p2.y;
+  applyVB();
+},{passive:false});
+
+let mousePan=null;
+wrap.addEventListener('mousedown',e=>{ if(S.drag)return; mousePan={sx:e.clientX,sy:e.clientY,vb:{...S.vb},moved:false}; });
+document.addEventListener('mousemove',e=>{
+  if(!mousePan)return;
+  const dx=e.clientX-mousePan.sx,dy=e.clientY-mousePan.sy;
+  if(Math.hypot(dx,dy)>4)mousePan.moved=true;
+  const rect=wrap.getBoundingClientRect();
+  S.vb.x=mousePan.vb.x-dx/rect.width*mousePan.vb.w;
+  S.vb.y=mousePan.vb.y-dy/rect.height*mousePan.vb.h;
+  applyVB();
+});
+document.addEventListener('mouseup',e=>{
+  if(!mousePan)return;
+  const moved=mousePan.moved; mousePan=null;
+  if(!moved&&Date.now()-_lastTouchTap>300&&addPtMode) handleAddPtTap({clientX:e.clientX,clientY:e.clientY});
+});
+
+// ═══════════════════════════════════════
+// ACTIVATE
+// ═══════════════════════════════════════
+function activateRoi(id) {
+  if(S.mergeMode&&id&&id!==S.mergeIds[0]){
+    const roi=getRoi(id);
+    if(roi&&roi.type==='polygon'&&!S.mergeIds.includes(id)){
+      S.mergeIds[1]=id;
+      S.rois.forEach(r=>buildRoiSvg(r));
+      updateToolbar();
+      document.getElementById('btn-merge-confirm').style.display='inline-block';
+      return;
+    }
+  }
+  S.activeId=id;
+  S.rois.forEach(r=>buildRoiSvg(r));
+  updateAll();
+}
+
+// ═══════════════════════════════════════
+// ADD POINT
+// ═══════════════════════════════════════
+let addPtMode=false;
+document.getElementById('btn-addpt').addEventListener('click',()=>{
+  addPtMode=!addPtMode;
+  document.getElementById('btn-addpt').classList.toggle('on',addPtMode);
+  document.getElementById('btn-addpt').textContent=addPtMode?'✓ TIPPEN':'＋ PUNKT';
+});
+
+function handleAddPtTap(t){
+  const roi=getRoi(S.activeId);
+  if(!roi||roi.type!=='polygon')return;
+  const pt=clientToSvg(t.clientX,t.clientY);
+  // Find nearest edge
+  const pts=roi.geo.points;
+  let bd=Infinity,bi=0;
+  pts.forEach((p,i)=>{ const d=ptSegDist(pt,p,pts[(i+1)%pts.length]); if(d<bd){bd=d;bi=i;} });
+  pts.splice(bi+1,0,{...pt});
+  buildRoiSvg(roi);
+  addPtMode=false;
+  document.getElementById('btn-addpt').classList.remove('on');
+  document.getElementById('btn-addpt').textContent='＋ PUNKT';
+}
+
+function ptSegDist(p,a,b){
+  const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+  if(!l2)return Math.hypot(p.x-a.x,p.y-a.y);
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
+  return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
+}
+
+// ═══════════════════════════════════════
+// MERGE — proper convex-hull-style ordering
+// ═══════════════════════════════════════
+document.getElementById('btn-merge').addEventListener('click',()=>{
+  S.mergeMode=true; S.mergeIds=[S.activeId];
+  updateToolbar();
+  document.getElementById('sc-active').textContent='→ Zweites Polygon wählen';
+});
+document.getElementById('btn-merge-cancel-mode').addEventListener('click',()=>{
+  S.mergeMode=false; S.mergeIds=[];
+  S.rois.forEach(r=>buildRoiSvg(r)); updateToolbar(); updateAll();
+});
+document.getElementById('btn-merge-confirm').addEventListener('click',()=>{
+  const r1=getRoi(S.mergeIds[0]),r2=getRoi(S.mergeIds[1]);
+  if(!r1||!r2)return;
+  const m=document.getElementById('m-merge');
+  document.getElementById('m-merge-info').textContent=`"${r1.name}"\n+\n"${r2.name}"\n\nDie Punkte beider Polygone werden zusammengefasst und nach Winkel sortiert (konvexe Hülle). Danach kannst du Punkte mit langem Druck löschen.`;
+  document.getElementById('m-merge-name').value=r1.name;
+  openModal(m);
+});
+document.getElementById('m-merge-cancel').addEventListener('click',()=>{ closeModal(document.getElementById('m-merge')); });
+document.getElementById('m-merge-ok').addEventListener('click',()=>{
+  const r1=getRoi(S.mergeIds[0]),r2=getRoi(S.mergeIds[1]);
+  if(!r1||!r2)return;
+  const name=document.getElementById('m-merge-name').value.trim()||r1.name;
+  // Merge: combine all points, compute convex hull so shape makes sense
+  const allP=[...r1.geo.points,...r2.geo.points];
+  r1.name=name;
+  r1.geo.points=convexHull(allP);
+  // Remove r2
+  if(r2.svgG)r2.svgG.remove();
+  lHnd.querySelectorAll(`[data-hroi="${r2.id}"]`).forEach(e=>e.remove());
+  S.rois=S.rois.filter(r=>r.id!==r2.id);
+  S.activeId=r1.id;
+  S.mergeMode=false; S.mergeIds=[];
+  closeModal(document.getElementById('m-merge'));
+  S.rois.forEach(r=>buildRoiSvg(r)); updateAll();
+});
+
+// Convex hull (Graham scan) — gives a valid non-self-intersecting polygon
+function convexHull(pts) {
+  if(pts.length<3)return pts;
+  const sorted=[...pts].sort((a,b)=>a.x!==b.x?a.x-b.x:a.y-b.y);
+  const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+  const lower=[];
+  for(const p of sorted){ while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop(); lower.push(p); }
+  const upper=[];
+  for(let i=sorted.length-1;i>=0;i--){ const p=sorted[i]; while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop(); upper.push(p); }
+  upper.pop(); lower.pop();
+  return [...lower,...upper];
+}
+
+// ═══════════════════════════════════════
+// SNAP TOGGLE
+// ═══════════════════════════════════════
+document.getElementById('btn-snap').addEventListener('click',()=>{
+  S.snapOn=!S.snapOn;
+  document.getElementById('btn-snap').classList.toggle('on',S.snapOn);
+});
+
+// ═══════════════════════════════════════
+// LAYER PANEL
+// ═══════════════════════════════════════
+function toggleLayerPanel(){
+  const p=document.getElementById('layer-sel-panel');
+  if(p.classList.contains('open')){ p.classList.remove('open'); return; }
+  p.innerHTML='';
+  LAYERS.forEach(layer=>{
+    const item=document.createElement('div');
+    item.className='layer-item';
+    item.innerHTML=`<div class="layer-dot" style="background:${layer.color}"></div><div class="layer-name">${layer.label}</div>`;
+    item.addEventListener('click',()=>{
+      const roi=getRoi(S.activeId);
+      if(roi){roi.layer=layer.id;buildRoiSvg(roi);updateAll();}
+      p.classList.remove('open');
+    });
+    p.appendChild(item);
+  });
+  p.classList.add('open');
+}
+
+document.getElementById('btn-layers').addEventListener('click',()=>{
+  closeAllPanels();
+  const vis=document.getElementById('layer-vis-panel');
+  vis.classList.toggle('open');
+  renderLayerVis();
+});
+
+function renderLayerVis(){
+  const inner=document.getElementById('layer-vis-inner');
+  inner.innerHTML='';
+  LAYERS.forEach(layer=>{
+    const on=S.layerVis[layer.id]!==false;
+    const div=document.createElement('div');
+    div.className='pitem';
+    div.innerHTML=`<div class="pdot" style="background:${on?layer.color:'#333'}"></div><div class="pname" style="color:${on?'#fff':'var(--dim)'}">${layer.label}</div><div style="font-family:Share Tech Mono,monospace;font-size:10px;color:${on?'var(--cyan)':'var(--dim)'}">${on?'SICHTBAR':'AUS'}</div>`;
+    div.addEventListener('click',()=>{
+      S.layerVis[layer.id]=!on;
+      S.rois.forEach(r=>{ if(r.layer===layer.id&&r.svgG) r.svgG.style.display=S.layerVis[layer.id]?'':'none'; });
+      renderLayerVis();
+    });
+    inner.appendChild(div);
+  });
+}
+['roi-panel','layer-vis-panel'].forEach(id=>{ document.getElementById(id).addEventListener('click',e=>{ if(e.target===document.getElementById(id))closeAllPanels(); }); });
+
+// ═══════════════════════════════════════
+// ROI LIST
+// ═══════════════════════════════════════
+document.getElementById('btn-rois').addEventListener('click',()=>{
+  closeAllPanels();
+  document.getElementById('roi-panel').classList.toggle('open');
+  renderRoiList();
+});
+
+function renderRoiList(){
+  const inner=document.getElementById('roi-panel-inner');
+  inner.innerHTML='';
+  if(!S.rois.length){ inner.innerHTML='<div class="pempty">Keine ROIs geladen</div>'; return; }
+  S.rois.forEach(roi=>{
+    const layer=layerById(roi.layer);
+    const div=document.createElement('div');
+    div.className='pitem'+(roi.id===S.activeId?' active':'');
+    const dot=document.createElement('div'); dot.className='pdot'; dot.style.background=layer.color;
+    const name=document.createElement('div'); name.className='pname'; name.textContent=roi.name;
+    const badge=document.createElement('span'); badge.className='pbadge'; badge.textContent=layer.label; badge.style.color=layer.color; badge.style.borderColor=layer.color+'60';
+    const grp=document.createElement('span'); grp.style.cssText='font-family:Share Tech Mono,monospace;font-size:9px;color:var(--dim);white-space:nowrap;flex-shrink:0'; grp.textContent=roi.group?'⊞'+roi.group:'';
+    const del=document.createElement('div'); del.className='pdel'; del.textContent='✕';
+    del.addEventListener('click',e=>{ e.stopPropagation();deleteRoi(roi.id); });
+    del.addEventListener('touchend',e=>{ e.stopPropagation();e.preventDefault();deleteRoi(roi.id); });
+    div.appendChild(dot);div.appendChild(name);div.appendChild(badge);div.appendChild(grp);div.appendChild(del);
+    div.addEventListener('click',e=>{ if(e.target===del)return; activateRoi(roi.id); closeAllPanels(); });
+    // Long press rename
+    let lpt=null;
+    div.addEventListener('touchstart',()=>{ lpt=setTimeout(()=>openRenameModal(roi.id),600); },{passive:true});
+    ['touchend','touchmove'].forEach(ev=>div.addEventListener(ev,()=>clearTimeout(lpt)));
+    inner.appendChild(div);
+  });
+}
+
+function deleteRoi(id){
+  const roi=getRoi(id); if(!roi)return;
+  if(roi.svgG)roi.svgG.remove();
+  lHnd.querySelectorAll(`[data-hroi="${id}"]`).forEach(e=>e.remove());
+  S.rois=S.rois.filter(r=>r.id!==id);
+  if(S.activeId===id) S.activeId=S.rois.length?S.rois[S.rois.length-1].id:null;
+  updateAll(); renderRoiList();
+  if(!S.rois.length) emptyEl.style.display='flex';
+}
+
+// ═══════════════════════════════════════
+// PROP PANEL
+// ═══════════════════════════════════════
+function updatePropPanel(){
+  const panel=document.getElementById('prop-panel');
+  const roi=getRoi(S.activeId);
+  if(!roi){ panel.classList.remove('open'); return; }
+  panel.classList.add('open');
+  document.getElementById('prop-name').textContent=roi.name;
+  const layer=layerById(roi.layer);
+  const pill=document.getElementById('prop-layer-pill');
+  pill.style.display='inline-block'; pill.textContent=layer.label;
+  pill.style.color=layer.color; pill.style.borderColor=layer.color;
+}
+document.getElementById('prop-rename-btn').addEventListener('click',()=>{ if(S.activeId)openRenameModal(S.activeId); });
+document.getElementById('prop-group-btn').addEventListener('click',()=>{ if(S.activeId)openGroupModal(S.activeId); });
+document.getElementById('prop-del-btn').addEventListener('click',()=>{ if(S.activeId)deleteRoi(S.activeId); });
+
+function openRenameModal(id){
+  const roi=getRoi(id); if(!roi)return;
+  document.getElementById('m-rename-input').value=roi.name;
+  document.getElementById('m-rename-ok').dataset.id=id;
+  openModal(document.getElementById('m-rename'));
+}
+document.getElementById('m-rename-cancel').addEventListener('click',()=>closeModal(document.getElementById('m-rename')));
+document.getElementById('m-rename-ok').addEventListener('click',()=>{
+  const roi=getRoi(document.getElementById('m-rename-ok').dataset.id);
+  if(roi){ roi.name=document.getElementById('m-rename-input').value.trim()||roi.name; buildRoiSvg(roi); updateAll(); renderRoiList(); }
+  closeModal(document.getElementById('m-rename'));
+});
+document.getElementById('m-rename-input').addEventListener('keydown',e=>{ if(e.key==='Enter')document.getElementById('m-rename-ok').click(); });
+
+function openGroupModal(id){
+  const roi=getRoi(id); if(!roi)return;
+  document.getElementById('m-group-input').value=roi.group||'';
+  document.getElementById('m-group-ok').dataset.id=id;
+  openModal(document.getElementById('m-group'));
+}
+document.getElementById('m-group-cancel').addEventListener('click',()=>closeModal(document.getElementById('m-group')));
+document.getElementById('m-group-ok').addEventListener('click',()=>{
+  const roi=getRoi(document.getElementById('m-group-ok').dataset.id);
+  if(roi){ roi.group=document.getElementById('m-group-input').value.trim(); updateAll(); renderRoiList(); }
+  closeModal(document.getElementById('m-group'));
+});
+document.getElementById('m-group-input').addEventListener('keydown',e=>{ if(e.key==='Enter')document.getElementById('m-group-ok').click(); });
+
+// ═══════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════
+function r2(v){ return Math.round(v*100)/100; }
+function edgeAngle(a,b){ let d=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI; if(d<0)d+=360; return Math.round(d*10)/10; }
+
+document.getElementById('btn-export').addEventListener('click',()=>{
+  const data={
+    meta:{ tool:'WorldCompositor v2.0', exportedAt:new Date().toISOString(), coordinateOrigin:'top-left', roiCount:S.rois.length },
+    rois:S.rois.map(roi=>{
+      const base={ id:roi.id, name:roi.name, type:roi.type, layer:roi.layer, group:roi.group||null, isCalibrationROI:false };
+      if(roi.type==='circle') return{...base,units:{cx:r2(roi.geo.cx),cy:r2(roi.geo.cy),r:r2(roi.geo.r)},pixels:null};
+      const pts=roi.geo.points;
+      const edges=pts.map((p,i)=>{ const n=pts[(i+1)%pts.length]; return{from:i,to:(i+1)%pts.length,lengthUnits:r2(Math.hypot(n.x-p.x,n.y-p.y)),angleDeg:edgeAngle(p,n)}; });
+      return{...base,units:{points:pts.map(p=>({x:r2(p.x),y:r2(p.y)}))},pixels:null,edges};
+    }),
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='worldmap_'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ═══════════════════════════════════════
+// TOOLBAR + STATUS
+// ═══════════════════════════════════════
+function updateToolbar(){
+  const roi=getRoi(S.activeId);
+  document.getElementById('btn-addpt').style.display=(roi&&roi.type==='polygon'&&!S.mergeMode)?'inline-block':'none';
+  document.getElementById('btn-merge').style.display=(roi&&roi.type==='polygon'&&!S.mergeMode)?'inline-block':'none';
+  document.getElementById('btn-merge-confirm').style.display=(S.mergeMode&&S.mergeIds.length===2)?'inline-block':'none';
+  document.getElementById('btn-merge-cancel-mode').style.display=S.mergeMode?'inline-block':'none';
+}
+function updateStatus(){
+  document.getElementById('sc-total').textContent=S.rois.length;
+  document.getElementById('roi-count').textContent=S.rois.length?`(${S.rois.length})`:'';
+  const roi=getRoi(S.activeId);
+  document.getElementById('sc-active').textContent=roi?roi.name:'—';
+  document.getElementById('sc-layer').textContent=roi?layerById(roi.layer).label:'—';
+  document.getElementById('sc-group').textContent=roi?.group||'—';
+}
+function updateAll(){ updateStatus(); updateToolbar(); updatePropPanel(); }
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+applyVB(); updateAll();
+document.addEventListener('contextmenu',e=>e.preventDefault());
+</script>
+
+</body>
+</html>
