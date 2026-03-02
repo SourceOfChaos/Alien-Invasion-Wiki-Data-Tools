@@ -592,138 +592,94 @@ function setMode(m) {
 }
 
 // ════════════════════════════════════════════════
-// ZOOM / PAN
+// ZOOM / PAN  — proven stable implementation
 // ════════════════════════════════════════════════
-
-// ── PINCH ZOOM (touch) ────────────────────────
-// Track both touches by identifier to avoid index-swap glitches
-let _pinch = null;  // { id0, id1, midSvg, dist }
-
-function getTouchById(touches, id) {
-  for (let i = 0; i < touches.length; i++)
-    if (touches[i].identifier === id) return touches[i];
-  return null;
-}
-
-function pinchMidClient(t0, t1) {
-  return { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
-}
-
-function pinchDist(t0, t1) {
-  return Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
-}
-
-// ── PAN (single touch) ─────────────────────────
-let _pan = null;   // { id, sx, sy, vb0, moved }
-
-// ── LAST TAP guard (prevent mouse+touch double-fire) ──
+let panState = null, pinchState = null;
 let _lastTapTime = 0;
 
 wrap.addEventListener('touchstart', e => {
-  e.preventDefault();  // prevent mouse fallback events entirely
-
   if (S.drag) return;
-
-  if (e.touches.length >= 2) {
-    // Start pinch — pick the first two touches
-    _pan = null;
-    const t0 = e.touches[0], t1 = e.touches[1];
-    const mid = pinchMidClient(t0, t1);
-    _pinch = {
-      id0: t0.identifier,
-      id1: t1.identifier,
-      midSvg: clientToSvg(mid.x, mid.y),
-      dist: pinchDist(t0, t1),
+  if (e.touches.length === 2) {
+    panState = null;
+    // Snapshot the FULL initial state — never mutate this during the gesture
+    pinchState = {
+      dist: Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY
+      ),
+      cx: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      cy: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      vb: { ...S.vb },   // frozen reference — never touched again
     };
+    e.preventDefault();
     return;
   }
-
-  // Single touch → pan
-  if (e.touches.length === 1 && !_pinch) {
-    const t = e.touches[0];
-    _pan = { id: t.identifier, sx: t.clientX, sy: t.clientY, vb0: { ...S.vb }, moved: false };
+  if (e.touches.length === 1) {
+    pinchState = null;
+    panState = { sx: e.touches[0].clientX, sy: e.touches[0].clientY, vb: { ...S.vb }, moved: false };
   }
 }, { passive: false });
 
 wrap.addEventListener('touchmove', e => {
+  if (S.drag) { e.preventDefault(); return; }
   e.preventDefault();
-  if (S.drag) return;
 
-  // ── Pinch ──
-  if (_pinch) {
-    const t0 = getTouchById(e.touches, _pinch.id0);
-    const t1 = getTouchById(e.touches, _pinch.id1);
-    if (!t0 || !t1) return;
+  if (e.touches.length === 2 && pinchState) {
+    const newDist = Math.hypot(
+      e.touches[1].clientX - e.touches[0].clientX,
+      e.touches[1].clientY - e.touches[0].clientY
+    );
+    const newCx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const newCy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
 
-    const newDist = pinchDist(t0, t1);
-    const ratio   = _pinch.dist / newDist;           // >1 = zoom out, <1 = zoom in
-    const mid     = pinchMidClient(t0, t1);
+    // Scale factor relative to INITIAL pinch distance — no drift
+    const scale = pinchState.dist / newDist;
 
-    // Scale around the fixed SVG mid-point captured at pinch-start
-    S.vb.w = _pinch.midSvg.x * 2 * ratio;            // temporary — corrected below
-    // Proper formula: scale, then translate so midSvg stays under finger-midpoint
-    const newW = S.vb.w * ratio;
-    const newH = S.vb.h * ratio;
-
-    // Anchor: midSvg should map to mid (client)
     const rect = wrap.getBoundingClientRect();
+    // SVG point under the initial pinch center (fixed pivot)
+    const pivotX = pinchState.vb.x + (pinchState.cx - rect.left) / rect.width  * pinchState.vb.w;
+    const pivotY = pinchState.vb.y + (pinchState.cy - rect.top)  / rect.height * pinchState.vb.h;
+
+    const newW = pinchState.vb.w * scale;
+    const newH = pinchState.vb.h * scale;
+
+    // Pan offset: finger midpoint moved since gesture start
+    const panDx = (newCx - pinchState.cx) / rect.width  * newW;
+    const panDy = (newCy - pinchState.cy) / rect.height * newH;
+
     S.vb.w = newW;
     S.vb.h = newH;
-    S.vb.x = _pinch.midSvg.x - (mid.x - rect.left) / rect.width  * S.vb.w;
-    S.vb.y = _pinch.midSvg.y - (mid.y - rect.top)  / rect.height * S.vb.h;
-
-    // Update reference for next frame
-    _pinch.dist   = newDist;
-    _pinch.midSvg = clientToSvg(mid.x, mid.y);   // recalculate after vb update
+    S.vb.x = pivotX - (pinchState.cx - rect.left) / rect.width  * newW - panDx;
+    S.vb.y = pivotY - (pinchState.cy - rect.top)  / rect.height * newH - panDy;
 
     clampVB(); applyVB();
     return;
   }
 
-  // ── Pan ──
-  if (_pan && e.touches.length === 1) {
-    const t = getTouchById(e.changedTouches, _pan.id) || getTouchById(e.touches, _pan.id);
-    if (!t) return;
-    const dx = t.clientX - _pan.sx;
-    const dy = t.clientY - _pan.sy;
-    if (Math.hypot(dx, dy) > 5) _pan.moved = true;
+  if (e.touches.length === 1 && panState) {
+    const dx = e.touches[0].clientX - panState.sx;
+    const dy = e.touches[0].clientY - panState.sy;
+    if (Math.hypot(dx, dy) > 6) panState.moved = true;
     const rect = wrap.getBoundingClientRect();
-    S.vb.x = _pan.vb0.x - dx / rect.width  * _pan.vb0.w;
-    S.vb.y = _pan.vb0.y - dy / rect.height * _pan.vb0.h;
+    S.vb.x = panState.vb.x - dx / rect.width  * panState.vb.w;
+    S.vb.y = panState.vb.y - dy / rect.height * panState.vb.h;
     clampVB(); applyVB();
   }
 }, { passive: false });
 
 wrap.addEventListener('touchend', e => {
-  e.preventDefault();
-
-  // If a pinch finger was lifted, cancel pinch cleanly
-  if (_pinch) {
-    const t0 = getTouchById(e.touches, _pinch.id0);
-    const t1 = getTouchById(e.touches, _pinch.id1);
-    if (!t0 || !t1) {
-      _pinch = null;
-      // Remaining single touch becomes a new pan origin (no tap)
-      if (e.touches.length === 1) {
-        const t = e.touches[0];
-        _pan = { id: t.identifier, sx: t.clientX, sy: t.clientY, vb0: { ...S.vb }, moved: true };
-        // moved:true so touchend won't trigger a tap
-      }
-    }
-    return;
-  }
-
-  if (e.touches.length === 0 && _pan) {
-    const moved = _pan.moved;
-    _pan = null;
+  if (e.touches.length < 2) pinchState = null;
+  if (e.touches.length === 0) {
+    const moved = panState?.moved;
+    panState = null;
     if (!moved && !S.drag) {
       _lastTapTime = Date.now();
       handleTap(e.changedTouches[0]);
     }
   }
-}, { passive: false });
+});
 
-wrap.addEventListener('touchcancel', () => { _pinch = null; _pan = null; });
+wrap.addEventListener('touchcancel', () => { pinchState = null; panState = null; });
 
 // ── Mouse wheel zoom ───────────────────────────
 wrap.addEventListener('wheel', e => {
@@ -741,7 +697,7 @@ wrap.addEventListener('wheel', e => {
 let _mousePan = null;
 wrap.addEventListener('mousedown', e => {
   if (S.drag) return;
-  _mousePan = { sx: e.clientX, sy: e.clientY, vb0: { ...S.vb }, moved: false };
+  _mousePan = { sx: e.clientX, sy: e.clientY, vb: { ...S.vb }, moved: false };
 });
 document.addEventListener('mousemove', e => {
   if (!_mousePan) return;
@@ -749,8 +705,8 @@ document.addEventListener('mousemove', e => {
   const dy = e.clientY - _mousePan.sy;
   if (Math.hypot(dx, dy) > 4) _mousePan.moved = true;
   const rect = wrap.getBoundingClientRect();
-  S.vb.x = _mousePan.vb0.x - dx / rect.width  * _mousePan.vb0.w;
-  S.vb.y = _mousePan.vb0.y - dy / rect.height * _mousePan.vb0.h;
+  S.vb.x = _mousePan.vb.x - dx / rect.width  * _mousePan.vb.w;
+  S.vb.y = _mousePan.vb.y - dy / rect.height * _mousePan.vb.h;
   clampVB(); applyVB();
 });
 document.addEventListener('mouseup', e => {
