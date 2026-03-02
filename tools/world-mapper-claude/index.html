@@ -18,7 +18,7 @@
 –danger:   #ff4757;
 –text:     #c8d0e8;
 –dim:      #5a6280;
-–handle-r: 14px; /* handle touch radius */
+–handle-r: 14px;
 }
 
 - { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -92,6 +92,7 @@ transition: opacity .1s;
 .btn.red   { border-color: var(–danger); color: var(–danger); }
 .btn.file  { border-color: var(–cyan); color: var(–cyan); }
 .btn.exp   { border-color: var(–accent); color: var(–accent); }
+.btn.imp   { border-color: var(–dim); color: var(–dim); }
 .btn[disabled] { opacity: .3; pointer-events: none; }
 
 /* ── STATUS ──────────────────────────────── */
@@ -135,10 +136,10 @@ display: none;
 position: fixed;
 inset: 0;
 z-index: 50;
-background: #000000c;
+background: #00000055;
 align-items: flex-start;
 justify-content: flex-start;
-padding-top: 110px; /* below header+toolbar+status */
+padding-top: 110px;
 }
 #roi-panel.open { display: flex; }
 #roi-panel-inner {
@@ -163,7 +164,7 @@ cursor: pointer;
 .rpname {
 font-family: ‘Share Tech Mono’, monospace;
 font-size: 12px; flex: 1;
-color: var(#ffffff);
+color: #ffffff;
 overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .rpitem.active .rpname { color: var(–accent); }
@@ -222,6 +223,17 @@ font-size: 14px; padding: 9px 11px; border-radius: 4px; outline: none;
 .finput:focus { border-color: var(–cyan); }
 .fhint { font-size: 11px; color: var(–dim); margin-top: 5px; line-height: 1.5; }
 .mbtns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+
+/* ── IMPORT WARNING ──────────────────────── */
+.import-warn {
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 10px;
+color: var(–danger);
+margin-top: 10px;
+line-height: 1.6;
+display: none;
+}
+.import-warn.show { display: block; }
 </style>
 
 </head>
@@ -230,6 +242,7 @@ font-size: 14px; padding: 9px 11px; border-radius: 4px; outline: none;
 <header>
   <div class="logo">◈ WORLDMAPPER</div>
   <div class="hdr-btns">
+    <button class="btn imp" id="btn-import">⬆ JSON</button>
     <button class="btn file" id="btn-load">📂 BILD</button>
     <button class="btn exp"  id="btn-export" disabled>⬇ JSON</button>
   </div>
@@ -269,12 +282,13 @@ font-size: 14px; padding: 9px 11px; border-radius: 4px; outline: none;
 <!-- ROI Panel -->
 
 <div id="roi-panel">
-  <div id="roi-panel-inner" id="rpi"></div>
+  <div id="roi-panel-inner"></div>
 </div>
 
-<!-- File input -->
+<!-- File inputs -->
 
 <input type="file" id="finput" accept="image/*" style="display:none">
+<input type="file" id="jinput" accept=".json,application/json" style="display:none">
 
 <!-- Modal: Name -->
 
@@ -319,14 +333,38 @@ font-size: 14px; padding: 9px 11px; border-radius: 4px; outline: none;
   </div>
 </div>
 
+<!-- Modal: Import -->
+
+<div class="modal-bg" id="m-import">
+  <div class="modal">
+    <div class="modal-title">⬆ JSON IMPORTIEREN</div>
+    <div class="fhint" style="margin-bottom:10px;">
+      Lädt ROIs und Kalibrierung aus einer vorherigen Session.<br>
+      Das Bild muss separat geladen werden (gleiche Auflösung empfohlen).
+    </div>
+    <div class="flabel">VERHALTEN</div>
+    <select class="finput" id="m-import-mode" style="cursor:pointer;">
+      <option value="replace">Bestehende ROIs ersetzen</option>
+      <option value="merge">ROIs zusammenführen (merge)</option>
+    </select>
+    <div class="import-warn" id="m-import-warn">
+      ⚠ Kein Bild geladen — Import trotzdem möglich,<br>aber ROIs erst nach Bildladen sichtbar.
+    </div>
+    <div class="mbtns">
+      <button class="btn" id="m-import-cancel">ABBRUCH</button>
+      <button class="btn cyan" id="m-import-ok">📂 DATEI WÄHLEN</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 // ════════════════════════════════════════════════
 // CONSTANTS & STATE
 // ════════════════════════════════════════════════
 const NS = 'http://www.w3.org/2000/svg';
-const HANDLE_HIT = 22;   // px hit radius for handles (screen pixels)
-const POLY_CLOSE_HIT = 26; // px screen distance to close polygon on first point
+const HANDLE_HIT   = 22;
+const POLY_CLOSE_HIT = 26;
 
 const PALETTE = [
   '#e8ff47','#ff6b81','#a29bfe','#fd79a8',
@@ -334,46 +372,46 @@ const PALETTE = [
 ];
 
 let S = {
-  img: null,          // { w, h, src }
+  img: null,
   vb: { x:0, y:0, w:0, h:0 },
   unitPerPx: null,
   calibId: null,
-  rois: [],           // ROI objects
+  rois: [],
   activeId: null,
-  mode: 'select',     // select | calib | circle | poly | addpt
-  polyPts: [],        // points during polygon creation
+  mode: 'select',
+  polyPts: [],
   polyName: '',
-  drag: null,         // active handle drag
-  pan: null,          // active pan
-  pinchDist: 0,
+  drag: null,
+  pan: null,
   roiPanelOpen: false,
-  addPtMode: false,   // waiting for tap on edge to insert point
   _roiSeq: 0,
 };
 
 // ════════════════════════════════════════════════
 // DOM REFS
 // ════════════════════════════════════════════════
-const wrap       = document.getElementById('wrap');
-const svgEl      = document.getElementById('svg');
-const lImg       = document.getElementById('l-img');
-const lRoi       = document.getElementById('l-roi');
-const lHandles   = document.getElementById('l-handles');
-const lPoly      = document.getElementById('l-polyprev');
-const emptyEl    = document.getElementById('empty');
-const roiPanel   = document.getElementById('roi-panel');
-const roiPanelInner = document.getElementById('roi-panel-inner');
-const fileInput  = document.getElementById('finput');
+const wrap            = document.getElementById('wrap');
+const svgEl           = document.getElementById('svg');
+const lImg            = document.getElementById('l-img');
+const lRoi            = document.getElementById('l-roi');
+const lHandles        = document.getElementById('l-handles');
+const lPoly           = document.getElementById('l-polyprev');
+const emptyEl         = document.getElementById('empty');
+const roiPanel        = document.getElementById('roi-panel');
+const roiPanelInner   = document.getElementById('roi-panel-inner');
+const fileInput       = document.getElementById('finput');
+const jsonInput       = document.getElementById('jinput');
 
-const btnLoad    = document.getElementById('btn-load');
-const btnExport  = document.getElementById('btn-export');
-const btnCalib   = document.getElementById('btn-calib');
-const btnCircle  = document.getElementById('btn-circle');
-const btnPoly    = document.getElementById('btn-poly');
-const btnAddPt   = document.getElementById('btn-addpt');
-const btnClosePoly = document.getElementById('btn-closepoly');
-const btnRois    = document.getElementById('btn-rois');
-const roiCount   = document.getElementById('roi-count');
+const btnLoad         = document.getElementById('btn-load');
+const btnExport       = document.getElementById('btn-export');
+const btnImport       = document.getElementById('btn-import');
+const btnCalib        = document.getElementById('btn-calib');
+const btnCircle       = document.getElementById('btn-circle');
+const btnPoly         = document.getElementById('btn-poly');
+const btnAddPt        = document.getElementById('btn-addpt');
+const btnClosePoly    = document.getElementById('btn-closepoly');
+const btnRois         = document.getElementById('btn-rois');
+const roiCount        = document.getElementById('roi-count');
 
 const scImg    = document.getElementById('sc-img');
 const scScale  = document.getElementById('sc-scale');
@@ -396,6 +434,12 @@ const mRenameInput  = document.getElementById('m-rename-input');
 const mRenameCancel = document.getElementById('m-rename-cancel');
 const mRenameOk     = document.getElementById('m-rename-ok');
 
+const mImport       = document.getElementById('m-import');
+const mImportMode   = document.getElementById('m-import-mode');
+const mImportWarn   = document.getElementById('m-import-warn');
+const mImportCancel = document.getElementById('m-import-cancel');
+const mImportOk     = document.getElementById('m-import-ok');
+
 // ════════════════════════════════════════════════
 // UTILS
 // ════════════════════════════════════════════════
@@ -415,7 +459,6 @@ function clientToSvg(cx, cy) {
   };
 }
 
-// Convert SVG distance to screen pixels
 function svgDistToScreen(d) {
   const rect = wrap.getBoundingClientRect();
   return d / S.vb.w * rect.width;
@@ -434,15 +477,15 @@ function clampVB() {
 
 function roiColor(roi) {
   if (roi.isCalib) return '#47ffe8';
-  const idx = S.rois.indexOf(roi);
-  return PALETTE[idx % PALETTE.length];
+  const idx = S.rois.filter(r => !r.isCalib).indexOf(roi);
+  return PALETTE[Math.max(0, idx) % PALETTE.length];
 }
 
 function getRoi(id) { return S.rois.find(r => r.id === id); }
 
 function openModal(m) {
   m.classList.add('open');
-  setTimeout(() => m.querySelector('input')?.focus(), 80);
+  setTimeout(() => m.querySelector('input,select')?.focus(), 80);
 }
 function closeModal(m) { m.classList.remove('open'); }
 
@@ -470,17 +513,14 @@ function updateStatus() {
 }
 
 function updateToolbar() {
-  // tool buttons
   [btnCalib, btnCircle, btnPoly].forEach(b => b.classList.remove('on'));
   if (S.mode === 'calib')  btnCalib.classList.add('on');
   if (S.mode === 'circle') btnCircle.classList.add('on');
   if (S.mode === 'poly' || S.mode === 'addpt') btnPoly.classList.add('on');
 
-  // poly-only buttons
   const inPoly = S.mode === 'poly';
   btnClosePoly.style.display = inPoly && S.polyPts.length >= 3 ? 'inline-block' : 'none';
 
-  // add-point button: visible when active ROI is polygon and mode=select
   const ar = getRoi(S.activeId);
   btnAddPt.style.display =
     (S.mode === 'select' || S.mode === 'addpt') && ar && ar.type === 'polygon'
@@ -498,10 +538,13 @@ fileInput.addEventListener('change', e => {
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
-    // reset
     S.img = { w: img.width, h: img.height, src: url };
-    S.rois = []; S.activeId = null; S.unitPerPx = null;
-    S.calibId = null; S._roiSeq = 0;
+    // Only reset rois if none imported yet
+    if (!S._importedWithoutImage) {
+      S.rois = []; S.activeId = null; S.unitPerPx = null;
+      S.calibId = null; S._roiSeq = 0;
+    }
+    S._importedWithoutImage = false;
     S.polyPts = []; S.polyName = '';
     lImg.innerHTML = ''; lRoi.innerHTML = '';
     lHandles.innerHTML = ''; lPoly.innerHTML = '';
@@ -513,7 +556,6 @@ fileInput.addEventListener('change', e => {
     });
     lImg.appendChild(imgNode);
 
-    // fit
     const cw = wrap.clientWidth, ch = wrap.clientHeight;
     const sc = Math.min(cw / img.width, ch / img.height) * 0.92;
     S.vb = {
@@ -527,7 +569,12 @@ fileInput.addEventListener('change', e => {
     btnCircle.disabled = false;
     btnPoly.disabled = false;
     btnExport.disabled = false;
-    setMode('calib');
+
+    // Rebuild any imported ROIs
+    S.rois.forEach(r => buildRoiSvg(r));
+    if (S.rois.length && !S.activeId) S.activeId = S.rois[S.rois.length-1].id;
+
+    setMode(S.rois.length ? 'select' : 'calib');
     updateStatus(); updateToolbar(); renderRoiList();
   };
   img.src = url;
@@ -545,77 +592,140 @@ function setMode(m) {
 }
 
 // ════════════════════════════════════════════════
-// ZOOM / PAN  — only fires when NOT dragging handle
+// ZOOM / PAN
 // ════════════════════════════════════════════════
-let lastPinchDist = 0;
 
-function pxDist(t) {
-  const dx = t[1].clientX - t[0].clientX;
-  const dy = t[1].clientY - t[0].clientY;
-  return Math.hypot(dx, dy);
+// ── PINCH ZOOM (touch) ────────────────────────
+// Track both touches by identifier to avoid index-swap glitches
+let _pinch = null;  // { id0, id1, midSvg, dist }
+
+function getTouchById(touches, id) {
+  for (let i = 0; i < touches.length; i++)
+    if (touches[i].identifier === id) return touches[i];
+  return null;
 }
 
+function pinchMidClient(t0, t1) {
+  return { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+}
+
+function pinchDist(t0, t1) {
+  return Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+}
+
+// ── PAN (single touch) ─────────────────────────
+let _pan = null;   // { id, sx, sy, vb0, moved }
+
+// ── LAST TAP guard (prevent mouse+touch double-fire) ──
+let _lastTapTime = 0;
+
 wrap.addEventListener('touchstart', e => {
-  if (S.drag) return; // handle drag active — ignore pan/zoom
-  if (e.touches.length === 2) {
-    lastPinchDist = pxDist(e.touches);
-    e.preventDefault();
+  e.preventDefault();  // prevent mouse fallback events entirely
+
+  if (S.drag) return;
+
+  if (e.touches.length >= 2) {
+    // Start pinch — pick the first two touches
+    _pan = null;
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const mid = pinchMidClient(t0, t1);
+    _pinch = {
+      id0: t0.identifier,
+      id1: t1.identifier,
+      midSvg: clientToSvg(mid.x, mid.y),
+      dist: pinchDist(t0, t1),
+    };
     return;
   }
-  if (e.touches.length === 1) {
+
+  // Single touch → pan
+  if (e.touches.length === 1 && !_pinch) {
     const t = e.touches[0];
-    S.pan = {
-      sx: t.clientX, sy: t.clientY,
-      vb: { ...S.vb },
-      moved: false,
-    };
+    _pan = { id: t.identifier, sx: t.clientX, sy: t.clientY, vb0: { ...S.vb }, moved: false };
   }
 }, { passive: false });
 
 wrap.addEventListener('touchmove', e => {
-  if (S.drag) { e.preventDefault(); return; }
-  if (e.touches.length === 2) {
-    e.preventDefault();
-    const nd = pxDist(e.touches);
-    const ratio = lastPinchDist / nd;
-    const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-    const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    const before = clientToSvg(cx, cy);
-    S.vb.w *= ratio; S.vb.h *= ratio;
-    const after = clientToSvg(cx, cy);
-    S.vb.x += before.x - after.x;
-    S.vb.y += before.y - after.y;
+  e.preventDefault();
+  if (S.drag) return;
+
+  // ── Pinch ──
+  if (_pinch) {
+    const t0 = getTouchById(e.touches, _pinch.id0);
+    const t1 = getTouchById(e.touches, _pinch.id1);
+    if (!t0 || !t1) return;
+
+    const newDist = pinchDist(t0, t1);
+    const ratio   = _pinch.dist / newDist;           // >1 = zoom out, <1 = zoom in
+    const mid     = pinchMidClient(t0, t1);
+
+    // Scale around the fixed SVG mid-point captured at pinch-start
+    S.vb.w = _pinch.midSvg.x * 2 * ratio;            // temporary — corrected below
+    // Proper formula: scale, then translate so midSvg stays under finger-midpoint
+    const newW = S.vb.w * ratio;
+    const newH = S.vb.h * ratio;
+
+    // Anchor: midSvg should map to mid (client)
+    const rect = wrap.getBoundingClientRect();
+    S.vb.w = newW;
+    S.vb.h = newH;
+    S.vb.x = _pinch.midSvg.x - (mid.x - rect.left) / rect.width  * S.vb.w;
+    S.vb.y = _pinch.midSvg.y - (mid.y - rect.top)  / rect.height * S.vb.h;
+
+    // Update reference for next frame
+    _pinch.dist   = newDist;
+    _pinch.midSvg = clientToSvg(mid.x, mid.y);   // recalculate after vb update
+
     clampVB(); applyVB();
-    lastPinchDist = nd;
     return;
   }
-  if (e.touches.length === 1 && S.pan) {
-    e.preventDefault();
-    const t = e.touches[0];
-    const dx = t.clientX - S.pan.sx;
-    const dy = t.clientY - S.pan.sy;
-    if (Math.hypot(dx, dy) > 5) S.pan.moved = true;
+
+  // ── Pan ──
+  if (_pan && e.touches.length === 1) {
+    const t = getTouchById(e.changedTouches, _pan.id) || getTouchById(e.touches, _pan.id);
+    if (!t) return;
+    const dx = t.clientX - _pan.sx;
+    const dy = t.clientY - _pan.sy;
+    if (Math.hypot(dx, dy) > 5) _pan.moved = true;
     const rect = wrap.getBoundingClientRect();
-    S.vb.x = S.pan.vb.x - dx / rect.width  * S.pan.vb.w;
-    S.vb.y = S.pan.vb.y - dy / rect.height * S.pan.vb.h;
+    S.vb.x = _pan.vb0.x - dx / rect.width  * _pan.vb0.w;
+    S.vb.y = _pan.vb0.y - dy / rect.height * _pan.vb0.h;
     clampVB(); applyVB();
   }
 }, { passive: false });
 
-let _lastTapTime = 0;
 wrap.addEventListener('touchend', e => {
-  if (e.touches.length < 2) lastPinchDist = 0;
-  if (e.touches.length === 0) {
-    const moved = S.pan?.moved;
-    S.pan = null;
+  e.preventDefault();
+
+  // If a pinch finger was lifted, cancel pinch cleanly
+  if (_pinch) {
+    const t0 = getTouchById(e.touches, _pinch.id0);
+    const t1 = getTouchById(e.touches, _pinch.id1);
+    if (!t0 || !t1) {
+      _pinch = null;
+      // Remaining single touch becomes a new pan origin (no tap)
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        _pan = { id: t.identifier, sx: t.clientX, sy: t.clientY, vb0: { ...S.vb }, moved: true };
+        // moved:true so touchend won't trigger a tap
+      }
+    }
+    return;
+  }
+
+  if (e.touches.length === 0 && _pan) {
+    const moved = _pan.moved;
+    _pan = null;
     if (!moved && !S.drag) {
       _lastTapTime = Date.now();
       handleTap(e.changedTouches[0]);
     }
   }
-});
+}, { passive: false });
 
+wrap.addEventListener('touchcancel', () => { _pinch = null; _pan = null; });
 
+// ── Mouse wheel zoom ───────────────────────────
 wrap.addEventListener('wheel', e => {
   e.preventDefault();
   if (!S.img) return;
@@ -627,48 +737,46 @@ wrap.addEventListener('wheel', e => {
   clampVB(); applyVB();
 }, { passive: false });
 
-// Mouse pan
-let mousePan = null;
+// ── Mouse pan ──────────────────────────────────
+let _mousePan = null;
 wrap.addEventListener('mousedown', e => {
   if (S.drag) return;
-  mousePan = { sx: e.clientX, sy: e.clientY, vb: { ...S.vb }, moved: false };
+  _mousePan = { sx: e.clientX, sy: e.clientY, vb0: { ...S.vb }, moved: false };
 });
 document.addEventListener('mousemove', e => {
-  if (!mousePan) return;
-  const dx = e.clientX - mousePan.sx;
-  const dy = e.clientY - mousePan.sy;
-  if (Math.hypot(dx, dy) > 4) mousePan.moved = true;
+  if (!_mousePan) return;
+  const dx = e.clientX - _mousePan.sx;
+  const dy = e.clientY - _mousePan.sy;
+  if (Math.hypot(dx, dy) > 4) _mousePan.moved = true;
   const rect = wrap.getBoundingClientRect();
-  S.vb.x = mousePan.vb.x - dx / rect.width  * mousePan.vb.w;
-  S.vb.y = mousePan.vb.y - dy / rect.height * mousePan.vb.h;
+  S.vb.x = _mousePan.vb0.x - dx / rect.width  * _mousePan.vb0.w;
+  S.vb.y = _mousePan.vb0.y - dy / rect.height * _mousePan.vb0.h;
   clampVB(); applyVB();
 });
 document.addEventListener('mouseup', e => {
-  if (!mousePan) return;
-  const moved = mousePan.moved;
-  mousePan = null;
+  if (!_mousePan) return;
+  const moved = _mousePan.moved;
+  _mousePan = null;
   if (!moved && Date.now() - _lastTapTime > 300) {
     handleTap({ clientX: e.clientX, clientY: e.clientY });
   }
 });
 
-
 // ════════════════════════════════════════════════
-// TAP HANDLER (canvas tap — no handle, no panel)
+// TAP HANDLER
 // ════════════════════════════════════════════════
 function handleTap(t) {
   if (!S.img) return;
   const pt = clientToSvg(t.clientX, t.clientY);
 
   if (S.mode === 'calib') {
-    // Place calib circle
     mNameTitle.textContent = '⊙ KALIBRIERUNGS-KREIS';
     mNameInput.value = 'Fangradius';
     openModal(mName);
     mNameOk._action = () => {
       const name = mNameInput.value.trim() || 'Fangradius';
       closeModal(mName);
-      const roi = addCircleRoi(name, pt, true);
+      addCircleRoi(name, pt, true);
       openModal(mCalib);
     };
     return;
@@ -688,14 +796,10 @@ function handleTap(t) {
   }
 
   if (S.mode === 'poly') {
-    // Check if tapping near first point → close
     if (S.polyPts.length >= 3) {
       const fp = S.polyPts[0];
       const screenDist = svgDistToScreen(Math.hypot(pt.x - fp.x, pt.y - fp.y));
-      if (screenDist < POLY_CLOSE_HIT) {
-        closePoly();
-        return;
-      }
+      if (screenDist < POLY_CLOSE_HIT) { closePoly(); return; }
     }
     S.polyPts.push({ ...pt });
     renderPolyPreview();
@@ -704,7 +808,6 @@ function handleTap(t) {
   }
 
   if (S.mode === 'addpt') {
-    // Find nearest edge of active polygon and insert point
     const roi = getRoi(S.activeId);
     if (!roi || roi.type !== 'polygon') { setMode('select'); return; }
     insertPolyPoint(roi, pt);
@@ -740,6 +843,97 @@ mRenameOk.addEventListener('click', () => {
 });
 mRenameInput.addEventListener('keydown', e => { if (e.key === 'Enter') mRenameOk.click(); });
 
+// ── Import modal ───────────────────────────────
+btnImport.addEventListener('click', () => {
+  mImportWarn.classList.toggle('show', !S.img);
+  openModal(mImport);
+});
+mImportCancel.addEventListener('click', () => closeModal(mImport));
+mImportOk.addEventListener('click', () => {
+  closeModal(mImport);
+  jsonInput.click();
+});
+
+jsonInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      importJson(data, mImportMode.value);
+    } catch(err) {
+      alert('JSON konnte nicht gelesen werden:\n' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  jsonInput.value = '';
+});
+
+function importJson(data, mergeMode) {
+  if (!data.rois || !Array.isArray(data.rois)) {
+    alert('Ungültiges Format: keine ROI-Liste gefunden.');
+    return;
+  }
+
+  if (mergeMode === 'replace') {
+    // Clear existing
+    S.rois.forEach(r => { if (r.svgG) r.svgG.remove(); });
+    lHandles.innerHTML = '';
+    S.rois = [];
+    S.calibId = null;
+    S.activeId = null;
+    S._roiSeq = 0;
+  }
+
+  // Restore calibration
+  if (data.meta?.unitPerPx && data.meta.calibrated) {
+    S.unitPerPx = data.meta.unitPerPx;
+  }
+
+  let lastId = null;
+  for (const rd of data.rois) {
+    const id = uid();
+    if (rd.isCalibrationROI && mergeMode === 'replace') S.calibId = id;
+
+    let roi;
+    if (rd.type === 'circle') {
+      const g = rd.pixels;
+      roi = {
+        id, name: rd.name || 'ROI',
+        type: 'circle', isCalib: !!rd.isCalibrationROI,
+        geo: { cx: g.cx, cy: g.cy, r: g.r },
+        svgG: null,
+      };
+    } else if (rd.type === 'polygon') {
+      const g = rd.pixels;
+      roi = {
+        id, name: rd.name || 'ROI',
+        type: 'polygon', isCalib: false,
+        geo: { points: g.points.map(p => ({ x: p.x, y: p.y })) },
+        svgG: null,
+      };
+    } else continue;
+
+    S.rois.push(roi);
+    if (S.img) buildRoiSvg(roi);
+    lastId = id;
+  }
+
+  if (!S.img) {
+    // Mark that we imported without image so image-load won't wipe rois
+    S._importedWithoutImage = true;
+    // Enable toolbar buttons so user can load image next
+    btnCalib.disabled = false;
+    btnCircle.disabled = false;
+    btnPoly.disabled = false;
+    btnExport.disabled = false;
+  }
+
+  if (lastId) activateRoi(lastId);
+  renderRoiList(); updateStatus(); updateToolbar();
+}
+
 // ════════════════════════════════════════════════
 // TOOLBAR BUTTONS
 // ════════════════════════════════════════════════
@@ -753,8 +947,7 @@ btnCircle.addEventListener('click', () => { if (S.img) setMode('circle'); });
 
 btnPoly.addEventListener('click', () => {
   if (!S.img) return;
-  if (S.mode === 'poly') return; // already drawing
-  // start poly
+  if (S.mode === 'poly') return;
   S.polyPts = [];
   mNameTitle.textContent = '⬡ NEUES POLYGON';
   mNameInput.value = '';
@@ -769,11 +962,10 @@ btnPoly.addEventListener('click', () => {
 btnClosePoly.addEventListener('click', () => closePoly());
 
 btnAddPt.addEventListener('click', () => {
-  if (S.mode === 'addpt') { setMode('select'); }
-  else { setMode('addpt'); }
+  if (S.mode === 'addpt') setMode('select');
+  else setMode('addpt');
 });
 
-// ROI panel
 btnRois.addEventListener('click', () => {
   S.roiPanelOpen = !S.roiPanelOpen;
   roiPanel.classList.toggle('open', S.roiPanelOpen);
@@ -824,7 +1016,6 @@ function renderPolyPreview() {
   const pts = S.polyPts;
   if (!pts.length) return;
   const color = '#e8ff47';
-
   if (pts.length >= 2) {
     const d = 'M' + pts.map(p => `${p.x},${p.y}`).join('L');
     lPoly.appendChild(mkSvg('path', {
@@ -833,15 +1024,13 @@ function renderPolyPreview() {
       'pointer-events': 'none',
     }));
   }
-  pts.forEach((p, i) => {
-    const c = mkSvg('circle', {
+  pts.forEach(p => {
+    lPoly.appendChild(mkSvg('circle', {
       cx: p.x, cy: p.y, r: 9,
       fill: color, stroke: '#0d0f14', 'stroke-width': 2,
       'pointer-events': 'none',
-    });
-    lPoly.appendChild(c);
+    }));
   });
-  // Close hint ring around first point
   if (pts.length >= 3) {
     lPoly.appendChild(mkSvg('circle', {
       cx: pts[0].x, cy: pts[0].y, r: 16,
@@ -872,54 +1061,42 @@ function buildRoiSvg(roi) {
   if (roi.svgG) roi.svgG.remove();
   const isActive = roi.id === S.activeId;
   const color = roiColor(roi);
-
   const g = document.createElementNS(NS, 'g');
   g.dataset.roiId = roi.id;
 
-  // ── CRITICAL: pointer-events NONE on all ROI shapes ──
-  // ROI shapes never capture touch/mouse — only handles do.
   if (roi.type === 'circle') {
-    const c = mkSvg('circle', {
+    g.appendChild(mkSvg('circle', {
       cx: roi.geo.cx, cy: roi.geo.cy, r: roi.geo.r,
-      fill: color + (isActive ? '18' : '08'),
+      fill: color + (isActive ? '55' : '28'),
       stroke: color,
       'stroke-width': isActive ? 2 : 0.8,
       opacity: isActive ? 1 : 0.5,
       'pointer-events': 'none',
-    });
-    g.appendChild(c);
+    }));
   } else {
-    const poly = mkSvg('polygon', {
+    g.appendChild(mkSvg('polygon', {
       points: roi.geo.points.map(p => `${p.x},${p.y}`).join(' '),
-      fill: color + (isActive ? '18' : '08'),
+      fill: color + (isActive ? '55' : '28'),
       stroke: color,
       'stroke-width': isActive ? 2 : 0.8,
       opacity: isActive ? 1 : 0.5,
       'pointer-events': 'none',
-    });
-    g.appendChild(poly);
+    }));
   }
 
   lRoi.appendChild(g);
   roi.svgG = g;
-
-  // Build handles only for active ROI
   buildHandles(roi);
 }
 
-function rebuildRoi(roi) {
-  buildRoiSvg(roi);
-}
+function rebuildRoi(roi) { buildRoiSvg(roi); }
 
 function buildHandles(roi) {
-  // Remove old handles
   lHandles.querySelectorAll(`[data-hroi="${roi.id}"]`).forEach(el => el.remove());
   if (roi.id !== S.activeId) return;
-
   const color = roiColor(roi);
 
   if (roi.type === 'circle') {
-    // Center handle
     const ch = mkSvg('circle', {
       cx: roi.geo.cx, cy: roi.geo.cy,
       r: HANDLE_HIT / 2,
@@ -930,7 +1107,6 @@ function buildHandles(roi) {
     lHandles.appendChild(ch);
     attachHandleDrag(ch, roi, moveCenterHandle);
 
-    // Radius handle (east)
     const rh = mkSvg('rect', {
       x: roi.geo.cx + roi.geo.r - HANDLE_HIT/2,
       y: roi.geo.cy - HANDLE_HIT/2,
@@ -943,7 +1119,6 @@ function buildHandles(roi) {
     attachHandleDrag(rh, roi, moveRadiusHandle);
 
   } else {
-    // Vertex handles
     roi.geo.points.forEach((p, i) => {
       const h = mkSvg('circle', {
         cx: p.x, cy: p.y, r: HANDLE_HIT / 2,
@@ -957,7 +1132,6 @@ function buildHandles(roi) {
         roi.geo.points[i].y = startGeo.points[i].y + dy;
       });
 
-      // Long press: delete vertex (min 3 points)
       let lpt = null;
       h.addEventListener('touchstart', () => {
         lpt = setTimeout(() => {
@@ -980,12 +1154,11 @@ function moveCenterHandle(roi, svgPt, startGeo, dx, dy) {
   roi.geo.cy = startGeo.cy + dy;
 }
 function moveRadiusHandle(roi, svgPt, startGeo, dx, dy) {
-  const nx = svgPt.x, ny = svgPt.y;
-  roi.geo.r = Math.max(4, Math.hypot(nx - roi.geo.cx, ny - roi.geo.cy));
+  roi.geo.r = Math.max(4, Math.hypot(svgPt.x - roi.geo.cx, svgPt.y - roi.geo.cy));
 }
 
 // ════════════════════════════════════════════════
-// HANDLE DRAG — touch & mouse
+// HANDLE DRAG
 // ════════════════════════════════════════════════
 function attachHandleDrag(el, roi, moveFn) {
   let startSvg = null, startGeo = null;
@@ -994,14 +1167,12 @@ function attachHandleDrag(el, roi, moveFn) {
     startSvg = clientToSvg(cx, cy);
     startGeo = JSON.parse(JSON.stringify(roi.geo));
     S.drag = true;
-    S.pan = null;
+    _pan = null; _pinch = null;
   }
   function move(cx, cy) {
     if (!S.drag || !startSvg) return;
     const cur = clientToSvg(cx, cy);
-    const dx = cur.x - startSvg.x;
-    const dy = cur.y - startSvg.y;
-    moveFn(roi, cur, startGeo, dx, dy);
+    moveFn(roi, cur, startGeo, cur.x - startSvg.x, cur.y - startSvg.y);
     syncRoiSvg(roi);
   }
   function end() { S.drag = false; startSvg = null; startGeo = null; }
@@ -1027,62 +1198,47 @@ function attachHandleDrag(el, roi, moveFn) {
 }
 
 // ════════════════════════════════════════════════
-// SYNC ROI SVG (during drag — no full rebuild)
+// SYNC ROI SVG (during drag)
 // ════════════════════════════════════════════════
 function syncRoiSvg(roi) {
   if (!roi.svgG) return;
   if (roi.type === 'circle') {
     const c = roi.svgG.querySelector('circle');
-    if (c) {
-      c.setAttribute('cx', roi.geo.cx);
-      c.setAttribute('cy', roi.geo.cy);
-      c.setAttribute('r', roi.geo.r);
-    }
-    // Sync center handle
+    if (c) { c.setAttribute('cx', roi.geo.cx); c.setAttribute('cy', roi.geo.cy); c.setAttribute('r', roi.geo.r); }
     const ch = lHandles.querySelector(`[data-htype="cc"][data-hroi="${roi.id}"]`);
     if (ch) { ch.setAttribute('cx', roi.geo.cx); ch.setAttribute('cy', roi.geo.cy); }
-    // Sync radius handle
     const rh = lHandles.querySelector(`[data-htype="cr"][data-hroi="${roi.id}"]`);
-    if (rh) {
-      rh.setAttribute('x', roi.geo.cx + roi.geo.r - HANDLE_HIT/2);
-      rh.setAttribute('y', roi.geo.cy - HANDLE_HIT/2);
-    }
+    if (rh) { rh.setAttribute('x', roi.geo.cx + roi.geo.r - HANDLE_HIT/2); rh.setAttribute('y', roi.geo.cy - HANDLE_HIT/2); }
   } else {
     const poly = roi.svgG.querySelector('polygon');
     if (poly) poly.setAttribute('points', roi.geo.points.map(p => `${p.x},${p.y}`).join(' '));
-    // sync vertex handles
-    const allHandles = lHandles.querySelectorAll(`[data-htype="pv"][data-hroi="${roi.id}"]`);
-    allHandles.forEach((h, i) => {
-      if (roi.geo.points[i]) {
-        h.setAttribute('cx', roi.geo.points[i].x);
-        h.setAttribute('cy', roi.geo.points[i].y);
-      }
+    lHandles.querySelectorAll(`[data-htype="pv"][data-hroi="${roi.id}"]`).forEach((h, i) => {
+      if (roi.geo.points[i]) { h.setAttribute('cx', roi.geo.points[i].x); h.setAttribute('cy', roi.geo.points[i].y); }
     });
   }
 }
 
 // ════════════════════════════════════════════════
-// INSERT POLYGON POINT (nearest edge)
+// INSERT POLYGON POINT
 // ════════════════════════════════════════════════
 function insertPolyPoint(roi, pt) {
   const pts = roi.geo.points;
   let bestDist = Infinity, bestIdx = 0;
   for (let i = 0; i < pts.length; i++) {
-    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const a = pts[i], b = pts[(i+1) % pts.length];
     const d = pointToSegmentDist(pt, a, b);
     if (d < bestDist) { bestDist = d; bestIdx = i; }
   }
-  // Insert after bestIdx
   pts.splice(bestIdx + 1, 0, { ...pt });
   rebuildRoi(roi);
 }
 
 function pointToSegmentDist(p, a, b) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const len2 = dx*dx + dy*dy;
-  if (len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
-  const t = Math.max(0, Math.min(1, ((p.x-a.x)*dx + (p.y-a.y)*dy) / len2));
-  return Math.hypot(p.x - (a.x + t*dx), p.y - (a.y + t*dy));
+  const dx = b.x-a.x, dy = b.y-a.y;
+  const len2 = dx*dx+dy*dy;
+  if (len2 === 0) return Math.hypot(p.x-a.x, p.y-a.y);
+  const t = Math.max(0, Math.min(1, ((p.x-a.x)*dx+(p.y-a.y)*dy)/len2));
+  return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
 }
 
 // ════════════════════════════════════════════════
@@ -1090,7 +1246,6 @@ function pointToSegmentDist(p, a, b) {
 // ════════════════════════════════════════════════
 function activateRoi(id) {
   S.activeId = id;
-  // Rebuild all ROI SVGs (active state changes visuals)
   S.rois.forEach(r => rebuildRoi(r));
   updateStatus(); updateToolbar();
 }
@@ -1144,7 +1299,6 @@ function renderRoiList() {
     del.addEventListener('click', e => { e.stopPropagation(); removeRoi(roi.id); });
     del.addEventListener('touchend', e => { e.stopPropagation(); e.preventDefault(); removeRoi(roi.id); });
 
-    // Long press to rename
     let lpt = null;
     div.addEventListener('touchstart', () => {
       lpt = setTimeout(() => {
@@ -1174,7 +1328,7 @@ function renderRoiList() {
 // JSON EXPORT
 // ════════════════════════════════════════════════
 function edgeAngle(a, b) {
-  let deg = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+  let deg = Math.atan2(b.y-a.y, b.x-a.x) * 180 / Math.PI;
   if (deg < 0) deg += 360;
   return Math.round(deg * 10) / 10;
 }
@@ -1183,7 +1337,6 @@ function r2(v) { return Math.round(v * 100) / 100; }
 btnExport.addEventListener('click', () => {
   const u = S.unitPerPx || 1;
   const cal = !!S.unitPerPx;
-
   const data = {
     meta: {
       tool: 'WorldMapper v2.0',
@@ -1227,8 +1380,7 @@ btnExport.addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = 'worldmap_' + new Date().toISOString().slice(0,10) + '.json';
+  a.href = url; a.download = 'worldmap_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
   URL.revokeObjectURL(url);
 });
