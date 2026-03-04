@@ -140,6 +140,8 @@ align-items: center; justify-content: center; gap: 10px; pointer-events: none;
   <button class="btn" id="btn-closepoly" style="display:none">✓ SCHLIESSEN</button>
   <div class="tsep"></div>
   <button class="btn" id="btn-rois">☰ ROIs <span id="roi-count"></span></button>
+  <div class="tsep"></div>
+  <button class="btn on" id="btn-ortho">⊓ 90°</button>
 </div>
 
 <div class="statusbar">
@@ -244,7 +246,6 @@ const PALETTE = ['#e8ff47','#ff6b81','#a29bfe','#fd79a8','#55efc4','#fdcb6e','#7
 let S = {
   img: null,
   vb: { x:0, y:0, w:0, h:0 },
-  // Separate scale factors for X and Y axes
   unitPerPxX: null,
   unitPerPxY: null,
   catchRadiusUnits: null,
@@ -256,6 +257,7 @@ let S = {
   polyName: '',
   drag: false,
   roiPanelOpen: false,
+  orthoSnap: true,   // 90° snap for polygon drawing
   _roiSeq: 0,
   _importedWithoutImage: false,
 };
@@ -282,6 +284,7 @@ const btnPoly       = document.getElementById('btn-poly');
 const btnAddPt      = document.getElementById('btn-addpt');
 const btnClosePoly  = document.getElementById('btn-closepoly');
 const btnRois       = document.getElementById('btn-rois');
+const btnOrtho      = document.getElementById('btn-ortho');
 const roiCount      = document.getElementById('roi-count');
 
 const scImg    = document.getElementById('sc-img');
@@ -533,7 +536,8 @@ function handleTap(t) {
       const fp = S.polyPts[0];
       if (svgDistToScreen(Math.hypot(pt.x-fp.x, pt.y-fp.y)) < POLY_CLOSE_HIT) { closePoly(); return; }
     }
-    S.polyPts.push({ ...pt });
+    const snapped = applyOrthoSnap(pt);
+    S.polyPts.push({ ...snapped });
     renderPolyPreview(); updateToolbar(); return;
   }
 
@@ -644,6 +648,52 @@ btnRois.addEventListener('click', () => {
 roiPanel.addEventListener('click', e => {
   if (e.target === roiPanel) { S.roiPanelOpen = false; roiPanel.classList.remove('open'); }
 });
+
+btnOrtho.addEventListener('click', () => {
+  S.orthoSnap = !S.orthoSnap;
+  btnOrtho.classList.toggle('on', S.orthoSnap);
+});
+
+// ── ORTHO SNAP ────────────────────────────────────
+// Constrains pt to be orthogonal (0/90/180/270°) relative to the last polygon segment.
+// If only one point exists, snaps to horizontal or vertical from it.
+// If 2+ points, snaps to the direction perpendicular or parallel to the last edge.
+function applyOrthoSnap(pt) {
+  if (!S.orthoSnap || S.polyPts.length === 0) return pt;
+  const last = S.polyPts[S.polyPts.length - 1];
+  const dx = pt.x - last.x;
+  const dy = pt.y - last.y;
+
+  if (S.polyPts.length === 1) {
+    // First segment: snap to nearest cardinal direction
+    if (Math.abs(dx) >= Math.abs(dy)) return { x: pt.x, y: last.y };
+    else return { x: last.x, y: pt.y };
+  }
+
+  // Subsequent segments: snap to direction perpendicular or parallel to previous edge
+  const prev = S.polyPts[S.polyPts.length - 2];
+  const ex = last.x - prev.x;
+  const ey = last.y - prev.y;
+  const elen = Math.hypot(ex, ey);
+  if (elen < 0.001) return pt;
+
+  // Unit vectors: parallel (along last edge) and perpendicular
+  const px = ex / elen, py = ey / elen;  // parallel
+  const nx = -py, ny = px;               // perpendicular (90° CCW)
+
+  // Project pt offset onto both axes
+  const projPar  = dx * px + dy * py;
+  const projPerp = dx * nx + dy * ny;
+
+  // Snap to whichever axis the new segment is closer to
+  if (Math.abs(projPar) >= Math.abs(projPerp)) {
+    // Parallel to last edge
+    return { x: last.x + projPar * px, y: last.y + projPar * py };
+  } else {
+    // Perpendicular to last edge
+    return { x: last.x + projPerp * nx, y: last.y + projPerp * ny };
+  }
+}
 
 // ── ROI CREATION ──────────────────────────────────
 function addEllipseRoi(name, center, isCalib) {
