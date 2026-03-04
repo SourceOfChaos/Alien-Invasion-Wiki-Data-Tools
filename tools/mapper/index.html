@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WorldMapper</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@300;400;500;600&display=swap');
+
+:root {
+–bg:     #0d0f14;
+–surf:   #141720;
+–surf2:  #1c2030;
+–border: #2a3048;
+–accent: #e8ff47;
+–cyan:   #47ffe8;
+–danger: #ff4757;
+–text:   #c8d0e8;
+–dim:    #5a6280;
+}
+
+- { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+background: var(–bg); color: var(–text);
+font-family: ‘Outfit’, sans-serif;
+height: 100dvh; display: flex; flex-direction: column;
+overflow: hidden; user-select: none; -webkit-user-select: none;
+}
+
+header {
+display: flex; align-items: center; justify-content: space-between;
+padding: 8px 12px; background: var(–surf);
+border-bottom: 1px solid var(–border); flex-shrink: 0; gap: 8px; z-index: 10;
+}
+.logo { font-family: ‘Share Tech Mono’, monospace; font-size: 12px; color: var(–accent); letter-spacing: 2px; }
+.hdr-btns { display: flex; gap: 6px; }
+
+.toolbar {
+display: flex; align-items: center; gap: 5px;
+padding: 6px 12px; background: var(–surf);
+border-bottom: 1px solid var(–border); flex-shrink: 0;
+overflow-x: auto; scrollbar-width: none;
+}
+.toolbar::-webkit-scrollbar { display: none; }
+.tsep { width: 1px; height: 18px; background: var(–border); flex-shrink: 0; }
+
+.btn {
+font-family: ‘Share Tech Mono’, monospace; font-size: 10px; letter-spacing: 1px;
+padding: 6px 10px; border: 1px solid var(–border); background: var(–surf2);
+color: var(–text); border-radius: 4px; cursor: pointer;
+white-space: nowrap; flex-shrink: 0; transition: opacity .1s;
+}
+.btn:active { opacity: .7; }
+.btn.on  { background: var(–accent); color: #0d0f14; border-color: var(–accent); }
+.btn.cyan { border-color: var(–cyan); color: var(–cyan); }
+.btn.cyan.on { background: var(–cyan); color: #0d0f14; }
+.btn.exp  { border-color: var(–accent); color: var(–accent); }
+.btn.imp  { border-color: var(–dim); color: var(–dim); }
+.btn[disabled] { opacity: .3; pointer-events: none; }
+
+.statusbar {
+display: flex; gap: 10px; padding: 4px 12px;
+background: var(–bg); border-bottom: 1px solid var(–border);
+flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
+}
+.statusbar::-webkit-scrollbar { display: none; }
+.chip { font-family: ‘Share Tech Mono’, monospace; font-size: 10px; color: var(–dim); white-space: nowrap; }
+.chip b { color: var(–cyan); font-weight: 400; }
+.chip.warn b { color: var(–danger); }
+
+#wrap {
+flex: 1; position: relative; overflow: hidden;
+background: #0a0c10; touch-action: none;
+}
+#svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+#roi-panel {
+display: none; position: fixed; inset: 0; z-index: 50;
+background: #00000055; align-items: flex-start; justify-content: flex-start;
+padding-top: 110px;
+}
+#roi-panel.open { display: flex; }
+#roi-panel-inner {
+background: #1c2030f5; border: 1px solid var(–border);
+border-radius: 0 0 8px 8px; width: 100%; max-height: 55vh;
+overflow-y: auto; scrollbar-width: thin;
+}
+.rpitem { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(–border); cursor: pointer; }
+.rpitem:last-child { border-bottom: none; }
+.rpitem.active { background: #e8ff4710; }
+.rpitem:active { background: var(–surf2); }
+.rpdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.rpname { font-family: ‘Share Tech Mono’, monospace; font-size: 12px; flex: 1; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rpitem.active .rpname { color: var(–accent); }
+.rptype { font-family: ‘Share Tech Mono’, monospace; font-size: 10px; color: var(–dim); flex-shrink: 0; }
+.rpdel  { font-size: 15px; color: var(–dim); padding: 2px 6px; flex-shrink: 0; }
+.rpempty { padding: 16px 14px; font-family: ‘Share Tech Mono’, monospace; font-size: 11px; color: var(–dim); text-align: center; }
+
+#empty {
+position: absolute; inset: 0; display: flex; flex-direction: column;
+align-items: center; justify-content: center; gap: 10px; pointer-events: none;
+}
+.empty-ico { font-size: 36px; opacity: .25; }
+.empty-txt { font-family: ‘Share Tech Mono’, monospace; font-size: 11px; color: var(–dim); text-align: center; line-height: 1.9; letter-spacing: 1px; }
+
+.modal-bg { display: none; position: fixed; inset: 0; background: #000b; z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+.modal-bg.open { display: flex; }
+.modal { background: var(–surf); border: 1px solid var(–border); border-radius: 10px; padding: 20px; width: 100%; max-width: 340px; }
+.modal-title { font-family: ‘Share Tech Mono’, monospace; font-size: 12px; color: var(–accent); letter-spacing: 2px; margin-bottom: 14px; }
+.flabel { font-family: ‘Share Tech Mono’, monospace; font-size: 10px; color: var(–dim); letter-spacing: 1px; margin-bottom: 5px; }
+.finput { width: 100%; background: var(–bg); border: 1px solid var(–border); color: var(–text); font-family: ‘Share Tech Mono’, monospace; font-size: 14px; padding: 9px 11px; border-radius: 4px; outline: none; }
+.finput:focus { border-color: var(–cyan); }
+.fhint { font-size: 11px; color: var(–dim); margin-top: 5px; line-height: 1.5; }
+.mbtns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.frow { display: flex; gap: 8px; margin-bottom: 10px; }
+.frow .finput { margin-bottom: 0; }
+.frow-label { font-family: ‘Share Tech Mono’, monospace; font-size: 10px; color: var(–dim); margin-bottom: 4px; }
+</style>
+
+</head>
+<body>
+
+<header>
+  <div class="logo">◈ WORLDMAPPER</div>
+  <div class="hdr-btns">
+    <button class="btn imp" id="btn-import">⬆ JSON</button>
+    <button class="btn file" id="btn-load">📂 BILD</button>
+    <button class="btn exp" id="btn-export" disabled>⬇ JSON</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <button class="btn cyan" id="btn-calib" disabled>⊙ KALIB</button>
+  <div class="tsep"></div>
+  <button class="btn" id="btn-circle" disabled>○ KREIS</button>
+  <button class="btn" id="btn-poly"   disabled>⬡ POLY</button>
+  <button class="btn" id="btn-addpt"  style="display:none">＋ PUNKT</button>
+  <button class="btn" id="btn-closepoly" style="display:none">✓ SCHLIESSEN</button>
+  <div class="tsep"></div>
+  <button class="btn" id="btn-rois">☰ ROIs <span id="roi-count"></span></button>
+</div>
+
+<div class="statusbar">
+  <div class="chip" id="sc-img">IMG <b>—</b></div>
+  <div class="chip" id="sc-scalex">X <b>—</b></div>
+  <div class="chip" id="sc-scaley">Y <b>—</b></div>
+  <div class="chip" id="sc-active">AKTIV <b>—</b></div>
+  <div class="chip" id="sc-mode">MODE <b>WÄHLEN</b></div>
+</div>
+
+<div id="wrap">
+  <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+    <g id="l-img"></g>
+    <g id="l-roi"></g>
+    <g id="l-handles"></g>
+    <g id="l-polyprev"></g>
+  </svg>
+  <div id="empty">
+    <div class="empty-ico">🗺</div>
+    <div class="empty-txt">BILD LADEN<br>→ ELLIPSE KALIBRIEREN (X+Y)<br>→ ROIs ERFASSEN<br>→ JSON EXPORT</div>
+  </div>
+</div>
+
+<div id="roi-panel"><div id="roi-panel-inner"></div></div>
+<input type="file" id="finput" accept="image/*" style="display:none">
+<input type="file" id="jinput" accept=".json,application/json" style="display:none">
+
+<!-- Modal: Name -->
+
+<div class="modal-bg" id="m-name">
+  <div class="modal">
+    <div class="modal-title" id="m-name-title">NEUES ROI</div>
+    <div class="flabel">NAME</div>
+    <input class="finput" id="m-name-input" type="text" autocomplete="off" placeholder="z.B. Kustov_Raum">
+    <div class="mbtns">
+      <button class="btn" id="m-name-cancel">ABBRUCH</button>
+      <button class="btn on" id="m-name-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Calib — ellipse with separate X/Y -->
+
+<div class="modal-bg" id="m-calib">
+  <div class="modal">
+    <div class="modal-title">KALIBRIERUNG</div>
+    <div class="fhint" style="margin-bottom:12px;font-size:11px;color:var(--dim)">
+      Fangradius in Spieleinheiten eingeben.<br>
+      <b style="color:var(--cyan)">rx</b> = waagerechter Radius (Ellipse breit)<br>
+      <b style="color:var(--cyan)">ry</b> = senkrechter Radius (Ellipse hoch)
+    </div>
+    <div class="flabel">FANGRADIUS IN SPIELEINHEITEN</div>
+    <input class="finput" id="m-calib-units" type="number" step="0.1" min="0.1" placeholder="z.B. 82" style="margin-bottom:10px;">
+    <div class="fhint" style="margin-bottom:4px;">Einheitenwert wird auf beide Achsen angewendet.</div>
+    <div class="mbtns">
+      <button class="btn" id="m-calib-cancel">ABBRUCH</button>
+      <button class="btn cyan" id="m-calib-ok">KALIBRIEREN</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Rename -->
+
+<div class="modal-bg" id="m-rename">
+  <div class="modal">
+    <div class="modal-title">UMBENENNEN</div>
+    <div class="flabel">NEUER NAME</div>
+    <input class="finput" id="m-rename-input" type="text" autocomplete="off">
+    <div class="mbtns">
+      <button class="btn" id="m-rename-cancel">ABBRUCH</button>
+      <button class="btn on" id="m-rename-ok">SPEICHERN</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Import -->
+
+<div class="modal-bg" id="m-import">
+  <div class="modal">
+    <div class="modal-title">⬆ JSON IMPORTIEREN</div>
+    <div class="fhint" style="margin-bottom:10px;">Lädt ROIs aus einer vorherigen Session. Bild separat laden.</div>
+    <div class="flabel">VERHALTEN</div>
+    <select class="finput" id="m-import-mode" style="cursor:pointer;margin-bottom:0;">
+      <option value="replace">Bestehende ROIs ersetzen</option>
+      <option value="merge">ROIs zusammenführen (merge)</option>
+    </select>
+    <div class="mbtns">
+      <button class="btn" id="m-import-cancel">ABBRUCH</button>
+      <button class="btn cyan" id="m-import-ok">📂 DATEI WÄHLEN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const NS = 'http://www.w3.org/2000/svg';
+const HANDLE_HIT    = 22;
+const POLY_CLOSE_HIT = 26;
+const PALETTE = ['#e8ff47','#ff6b81','#a29bfe','#fd79a8','#55efc4','#fdcb6e','#74b9ff','#ff7675'];
+
+let S = {
+  img: null,
+  vb: { x:0, y:0, w:0, h:0 },
+  // Separate scale factors for X and Y axes
+  unitPerPxX: null,
+  unitPerPxY: null,
+  catchRadiusUnits: null,
+  calibId: null,
+  rois: [],
+  activeId: null,
+  mode: 'select',
+  polyPts: [],
+  polyName: '',
+  drag: false,
+  roiPanelOpen: false,
+  _roiSeq: 0,
+  _importedWithoutImage: false,
+};
+
+// ── DOM ──────────────────────────────────────────
+const wrap          = document.getElementById('wrap');
+const svgEl         = document.getElementById('svg');
+const lImg          = document.getElementById('l-img');
+const lRoi          = document.getElementById('l-roi');
+const lHandles      = document.getElementById('l-handles');
+const lPoly         = document.getElementById('l-polyprev');
+const emptyEl       = document.getElementById('empty');
+const roiPanel      = document.getElementById('roi-panel');
+const roiPanelInner = document.getElementById('roi-panel-inner');
+const fileInput     = document.getElementById('finput');
+const jsonInput     = document.getElementById('jinput');
+
+const btnLoad       = document.getElementById('btn-load');
+const btnExport     = document.getElementById('btn-export');
+const btnImport     = document.getElementById('btn-import');
+const btnCalib      = document.getElementById('btn-calib');
+const btnCircle     = document.getElementById('btn-circle');
+const btnPoly       = document.getElementById('btn-poly');
+const btnAddPt      = document.getElementById('btn-addpt');
+const btnClosePoly  = document.getElementById('btn-closepoly');
+const btnRois       = document.getElementById('btn-rois');
+const roiCount      = document.getElementById('roi-count');
+
+const scImg    = document.getElementById('sc-img');
+const scScaleX = document.getElementById('sc-scalex');
+const scScaleY = document.getElementById('sc-scaley');
+const scActive = document.getElementById('sc-active');
+const scMode   = document.getElementById('sc-mode');
+
+const mName       = document.getElementById('m-name');
+const mNameTitle  = document.getElementById('m-name-title');
+const mNameInput  = document.getElementById('m-name-input');
+const mNameCancel = document.getElementById('m-name-cancel');
+const mNameOk     = document.getElementById('m-name-ok');
+
+const mCalib        = document.getElementById('m-calib');
+const mCalibUnits   = document.getElementById('m-calib-units');
+const mCalibCancel  = document.getElementById('m-calib-cancel');
+const mCalibOk      = document.getElementById('m-calib-ok');
+
+const mRename       = document.getElementById('m-rename');
+const mRenameInput  = document.getElementById('m-rename-input');
+const mRenameCancel = document.getElementById('m-rename-cancel');
+const mRenameOk     = document.getElementById('m-rename-ok');
+
+const mImport       = document.getElementById('m-import');
+const mImportMode   = document.getElementById('m-import-mode');
+const mImportCancel = document.getElementById('m-import-cancel');
+const mImportOk     = document.getElementById('m-import-ok');
+
+// ── UTILS ─────────────────────────────────────────
+function uid() { return 'r' + (++S._roiSeq); }
+function mkSvg(tag, attrs) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+function clientToSvg(cx, cy) {
+  const rect = wrap.getBoundingClientRect();
+  return { x: S.vb.x + (cx-rect.left)/rect.width*S.vb.w, y: S.vb.y + (cy-rect.top)/rect.height*S.vb.h };
+}
+function svgDistToScreen(d) {
+  return d / S.vb.w * wrap.getBoundingClientRect().width;
+}
+function applyVB() { svgEl.setAttribute('viewBox', `${S.vb.x} ${S.vb.y} ${S.vb.w} ${S.vb.h}`); }
+function clampVB() {
+  if (!S.img) return;
+  const m = S.vb.w * 0.5;
+  S.vb.x = Math.max(-m, Math.min(S.img.w + m - S.vb.w, S.vb.x));
+  S.vb.y = Math.max(-m, Math.min(S.img.h + m - S.vb.h, S.vb.y));
+}
+function roiColor(roi) {
+  if (roi.isCalib) return '#47ffe8';
+  const idx = S.rois.filter(r => !r.isCalib).indexOf(roi);
+  return PALETTE[Math.max(0,idx) % PALETTE.length];
+}
+function getRoi(id) { return S.rois.find(r => r.id === id); }
+function openModal(m) { m.classList.add('open'); setTimeout(() => m.querySelector('input,select')?.focus(), 80); }
+function closeModal(m) { m.classList.remove('open'); }
+function isCalibrated() { return !!(S.unitPerPxX && S.unitPerPxY); }
+
+// ── STATUS ────────────────────────────────────────
+function updateStatus() {
+  scImg.querySelector('b').textContent = S.img ? `${S.img.w}×${S.img.h}` : '—';
+  if (isCalibrated()) {
+    scScaleX.querySelector('b').textContent = S.unitPerPxX.toFixed(4) + 'u/px';
+    scScaleY.querySelector('b').textContent = S.unitPerPxY.toFixed(4) + 'u/px';
+    scScaleX.classList.remove('warn'); scScaleY.classList.remove('warn');
+  } else {
+    scScaleX.querySelector('b').textContent = '—';
+    scScaleY.querySelector('b').textContent = '—';
+    scScaleX.classList.add('warn'); scScaleY.classList.add('warn');
+  }
+  const ar = getRoi(S.activeId);
+  scActive.querySelector('b').textContent = ar ? ar.name : '—';
+  scMode.querySelector('b').textContent = S.mode.toUpperCase();
+  roiCount.textContent = S.rois.length ? `(${S.rois.length})` : '';
+}
+
+function updateToolbar() {
+  [btnCalib, btnCircle, btnPoly].forEach(b => b.classList.remove('on'));
+  if (S.mode === 'calib')  btnCalib.classList.add('on');
+  if (S.mode === 'circle') btnCircle.classList.add('on');
+  if (S.mode === 'poly' || S.mode === 'addpt') btnPoly.classList.add('on');
+  btnClosePoly.style.display = S.mode === 'poly' && S.polyPts.length >= 3 ? 'inline-block' : 'none';
+  const ar = getRoi(S.activeId);
+  btnAddPt.style.display = (S.mode === 'select' || S.mode === 'addpt') && ar && ar.type === 'polygon' ? 'inline-block' : 'none';
+  btnAddPt.classList.toggle('on', S.mode === 'addpt');
+}
+
+// ── IMAGE LOAD ────────────────────────────────────
+btnLoad.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    S.img = { w: img.width, h: img.height, src: url };
+    if (!S._importedWithoutImage) {
+      S.rois = []; S.activeId = null;
+      S.unitPerPxX = null; S.unitPerPxY = null; S.catchRadiusUnits = null;
+      S.calibId = null; S._roiSeq = 0;
+    }
+    S._importedWithoutImage = false;
+    S.polyPts = []; S.polyName = '';
+    lImg.innerHTML = ''; lRoi.innerHTML = ''; lHandles.innerHTML = ''; lPoly.innerHTML = '';
+
+    lImg.appendChild(mkSvg('image', { href: url, x:0, y:0, width: img.width, height: img.height, preserveAspectRatio: 'none' }));
+
+    const cw = wrap.clientWidth, ch = wrap.clientHeight;
+    const sc = Math.min(cw / img.width, ch / img.height) * 0.92;
+    S.vb = { x: -(cw/sc - img.width)/2, y: -(ch/sc - img.height)/2, w: cw/sc, h: ch/sc };
+    applyVB();
+    emptyEl.style.display = 'none';
+    btnCalib.disabled = false; btnCircle.disabled = false; btnPoly.disabled = false; btnExport.disabled = false;
+    S.rois.forEach(r => buildRoiSvg(r));
+    if (S.rois.length && !S.activeId) S.activeId = S.rois[S.rois.length-1].id;
+    setMode(S.rois.length ? 'select' : 'calib');
+    updateStatus(); updateToolbar(); renderRoiList();
+  };
+  img.src = url; fileInput.value = '';
+});
+
+// ── MODE ──────────────────────────────────────────
+function setMode(m) {
+  if (S.mode === 'poly' && m !== 'poly' && m !== 'addpt') cancelPoly();
+  S.mode = m;
+  updateStatus(); updateToolbar();
+}
+
+// ── ZOOM / PAN ────────────────────────────────────
+let panState = null, pinchState = null, _lastTapTime = 0;
+
+wrap.addEventListener('touchstart', e => {
+  if (S.drag) return;
+  if (e.touches.length === 2) {
+    panState = null;
+    pinchState = {
+      dist: Math.hypot(e.touches[1].clientX-e.touches[0].clientX, e.touches[1].clientY-e.touches[0].clientY),
+      cx: (e.touches[0].clientX+e.touches[1].clientX)/2,
+      cy: (e.touches[0].clientY+e.touches[1].clientY)/2,
+      vb: { ...S.vb },
+    };
+    e.preventDefault(); return;
+  }
+  if (e.touches.length === 1) {
+    pinchState = null;
+    panState = { sx: e.touches[0].clientX, sy: e.touches[0].clientY, vb: { ...S.vb }, moved: false };
+  }
+}, { passive: false });
+
+wrap.addEventListener('touchmove', e => {
+  if (S.drag) { e.preventDefault(); return; }
+  e.preventDefault();
+  if (e.touches.length === 2 && pinchState) {
+    const newDist = Math.hypot(e.touches[1].clientX-e.touches[0].clientX, e.touches[1].clientY-e.touches[0].clientY);
+    const newCx = (e.touches[0].clientX+e.touches[1].clientX)/2;
+    const newCy = (e.touches[0].clientY+e.touches[1].clientY)/2;
+    const scale = pinchState.dist / newDist;
+    const rect = wrap.getBoundingClientRect();
+    const pivotX = pinchState.vb.x + (pinchState.cx-rect.left)/rect.width  * pinchState.vb.w;
+    const pivotY = pinchState.vb.y + (pinchState.cy-rect.top) /rect.height * pinchState.vb.h;
+    const newW = pinchState.vb.w * scale, newH = pinchState.vb.h * scale;
+    const panDx = (newCx-pinchState.cx)/rect.width  * newW;
+    const panDy = (newCy-pinchState.cy)/rect.height * newH;
+    S.vb.w = newW; S.vb.h = newH;
+    S.vb.x = pivotX - (pinchState.cx-rect.left)/rect.width  * newW - panDx;
+    S.vb.y = pivotY - (pinchState.cy-rect.top) /rect.height * newH - panDy;
+    clampVB(); applyVB(); return;
+  }
+  if (e.touches.length === 1 && panState) {
+    const dx = e.touches[0].clientX - panState.sx, dy = e.touches[0].clientY - panState.sy;
+    if (Math.hypot(dx,dy) > 6) panState.moved = true;
+    const rect = wrap.getBoundingClientRect();
+    S.vb.x = panState.vb.x - dx/rect.width  * panState.vb.w;
+    S.vb.y = panState.vb.y - dy/rect.height * panState.vb.h;
+    clampVB(); applyVB();
+  }
+}, { passive: false });
+
+wrap.addEventListener('touchend', e => {
+  if (e.touches.length < 2) pinchState = null;
+  if (e.touches.length === 0) {
+    const moved = panState?.moved; panState = null;
+    if (!moved && !S.drag) { _lastTapTime = Date.now(); handleTap(e.changedTouches[0]); }
+  }
+});
+wrap.addEventListener('touchcancel', () => { pinchState = null; panState = null; });
+
+wrap.addEventListener('wheel', e => {
+  e.preventDefault(); if (!S.img) return;
+  const f = e.deltaY > 0 ? 1.1 : 0.9;
+  const p = clientToSvg(e.clientX, e.clientY);
+  S.vb.w *= f; S.vb.h *= f;
+  const p2 = clientToSvg(e.clientX, e.clientY);
+  S.vb.x += p.x-p2.x; S.vb.y += p.y-p2.y;
+  clampVB(); applyVB();
+}, { passive: false });
+
+let _mousePan = null;
+wrap.addEventListener('mousedown', e => { if (S.drag) return; _mousePan = { sx: e.clientX, sy: e.clientY, vb: { ...S.vb }, moved: false }; });
+document.addEventListener('mousemove', e => {
+  if (!_mousePan) return;
+  const dx = e.clientX-_mousePan.sx, dy = e.clientY-_mousePan.sy;
+  if (Math.hypot(dx,dy) > 4) _mousePan.moved = true;
+  const rect = wrap.getBoundingClientRect();
+  S.vb.x = _mousePan.vb.x - dx/rect.width  * _mousePan.vb.w;
+  S.vb.y = _mousePan.vb.y - dy/rect.height * _mousePan.vb.h;
+  clampVB(); applyVB();
+});
+document.addEventListener('mouseup', e => {
+  if (!_mousePan) return;
+  const moved = _mousePan.moved; _mousePan = null;
+  if (!moved && Date.now()-_lastTapTime > 300) handleTap({ clientX: e.clientX, clientY: e.clientY });
+});
+
+// ── TAP HANDLER ───────────────────────────────────
+function handleTap(t) {
+  if (!S.img) return;
+  const pt = clientToSvg(t.clientX, t.clientY);
+
+  if (S.mode === 'calib') {
+    mNameTitle.textContent = '⊙ KALIBRIERUNGS-ELLIPSE';
+    mNameInput.value = 'Fangradius';
+    openModal(mName);
+    mNameOk._action = () => {
+      const name = mNameInput.value.trim() || 'Fangradius';
+      closeModal(mName);
+      addEllipseRoi(name, pt, true);
+      openModal(mCalib);
+    };
+    return;
+  }
+
+  if (S.mode === 'circle') {
+    mNameTitle.textContent = '○ NEUER KREIS';
+    mNameInput.value = '';
+    openModal(mName);
+    mNameOk._action = () => {
+      const name = mNameInput.value.trim() || ('Kreis_' + S._roiSeq);
+      closeModal(mName);
+      addEllipseRoi(name, pt, false);
+      setMode('select');
+    };
+    return;
+  }
+
+  if (S.mode === 'poly') {
+    if (S.polyPts.length >= 3) {
+      const fp = S.polyPts[0];
+      if (svgDistToScreen(Math.hypot(pt.x-fp.x, pt.y-fp.y)) < POLY_CLOSE_HIT) { closePoly(); return; }
+    }
+    S.polyPts.push({ ...pt });
+    renderPolyPreview(); updateToolbar(); return;
+  }
+
+  if (S.mode === 'addpt') {
+    const roi = getRoi(S.activeId);
+    if (!roi || roi.type !== 'polygon') { setMode('select'); return; }
+    insertPolyPoint(roi, pt);
+    setMode('select'); return;
+  }
+}
+
+// ── MODAL LOGIC ───────────────────────────────────
+mNameCancel.addEventListener('click', () => { closeModal(mName); setMode('select'); });
+mNameOk.addEventListener('click', () => { if (mNameOk._action) mNameOk._action(); });
+mNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') mNameOk.click(); });
+
+mCalibCancel.addEventListener('click', () => closeModal(mCalib));
+mCalibOk.addEventListener('click', () => {
+  const units = parseFloat(mCalibUnits.value);
+  if (!units || units <= 0) return;
+  const roi = getRoi(S.calibId);
+  if (!roi) return;
+  // rx and ry are stored in geo.rx / geo.ry
+  S.unitPerPxX = units / roi.geo.rx;
+  S.unitPerPxY = units / roi.geo.ry;
+  S.catchRadiusUnits = units;
+  closeModal(mCalib);
+  setMode('select');
+  updateStatus(); rebuildRoi(roi); // redraw with updated label
+});
+mCalibUnits.addEventListener('keydown', e => { if (e.key === 'Enter') mCalibOk.click(); });
+
+mRenameCancel.addEventListener('click', () => closeModal(mRename));
+mRenameOk.addEventListener('click', () => {
+  const roi = getRoi(mRenameOk._roiId);
+  if (roi) roi.name = mRenameInput.value.trim() || roi.name;
+  closeModal(mRename); renderRoiList(); updateStatus();
+});
+mRenameInput.addEventListener('keydown', e => { if (e.key === 'Enter') mRenameOk.click(); });
+
+btnImport.addEventListener('click', () => openModal(mImport));
+mImportCancel.addEventListener('click', () => closeModal(mImport));
+mImportOk.addEventListener('click', () => { closeModal(mImport); jsonInput.click(); });
+jsonInput.addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try { importJson(JSON.parse(ev.target.result), mImportMode.value); }
+    catch(err) { alert('JSON konnte nicht gelesen werden:\n' + err.message); }
+  };
+  reader.readAsText(file); jsonInput.value = '';
+});
+
+function importJson(data, mergeMode) {
+  if (!data.rois || !Array.isArray(data.rois)) { alert('Ungültiges Format.'); return; }
+  if (mergeMode === 'replace') {
+    S.rois.forEach(r => { if (r.svgG) r.svgG.remove(); });
+    lHandles.innerHTML = ''; S.rois = []; S.calibId = null; S.activeId = null; S._roiSeq = 0;
+    S.unitPerPxX = null; S.unitPerPxY = null; S.catchRadiusUnits = null;
+  }
+  // Restore calibration from v3 format
+  if (data.meta?.unitPerPxX) { S.unitPerPxX = data.meta.unitPerPxX; S.unitPerPxY = data.meta.unitPerPxY; S.catchRadiusUnits = data.meta.catchRadiusUnits; }
+  let lastId = null;
+  for (const rd of data.rois) {
+    const id = uid();
+    if (rd.isCalibrationROI && mergeMode === 'replace') S.calibId = id;
+    let roi;
+    if (rd.type === 'ellipse' || rd.type === 'circle') {
+      const g = rd.pixels;
+      roi = { id, name: rd.name||'ROI', type: 'ellipse', isCalib: !!rd.isCalibrationROI, geo: { cx: g.cx, cy: g.cy, rx: g.rx||g.r, ry: g.ry||g.r }, svgG: null };
+    } else if (rd.type === 'polygon') {
+      const g = rd.pixels;
+      roi = { id, name: rd.name||'ROI', type: 'polygon', isCalib: false, geo: { points: g.points.map(p => ({ x: p.x, y: p.y })) }, svgG: null };
+    } else continue;
+    S.rois.push(roi);
+    if (S.img) buildRoiSvg(roi);
+    lastId = id;
+  }
+  if (!S.img) { S._importedWithoutImage = true; btnCalib.disabled=false; btnCircle.disabled=false; btnPoly.disabled=false; btnExport.disabled=false; }
+  if (lastId) activateRoi(lastId);
+  renderRoiList(); updateStatus(); updateToolbar();
+}
+
+// ── TOOLBAR BUTTONS ───────────────────────────────
+btnCalib.addEventListener('click', () => {
+  if (!S.img) return;
+  if (S.calibId) { openModal(mCalib); return; }
+  setMode('calib');
+});
+btnCircle.addEventListener('click', () => { if (S.img) setMode('circle'); });
+btnPoly.addEventListener('click', () => {
+  if (!S.img || S.mode === 'poly') return;
+  S.polyPts = [];
+  mNameTitle.textContent = '⬡ NEUES POLYGON';
+  mNameInput.value = '';
+  openModal(mName);
+  mNameOk._action = () => {
+    S.polyName = mNameInput.value.trim() || ('Poly_' + (S._roiSeq+1));
+    closeModal(mName); setMode('poly');
+  };
+});
+btnClosePoly.addEventListener('click', () => closePoly());
+btnAddPt.addEventListener('click', () => { setMode(S.mode === 'addpt' ? 'select' : 'addpt'); });
+btnRois.addEventListener('click', () => {
+  S.roiPanelOpen = !S.roiPanelOpen;
+  roiPanel.classList.toggle('open', S.roiPanelOpen);
+});
+roiPanel.addEventListener('click', e => {
+  if (e.target === roiPanel) { S.roiPanelOpen = false; roiPanel.classList.remove('open'); }
+});
+
+// ── ROI CREATION ──────────────────────────────────
+function addEllipseRoi(name, center, isCalib) {
+  const defR = S.img ? Math.min(S.img.w, S.img.h) * 0.06 : 50;
+  const roi = {
+    id: uid(), name, type: 'ellipse', isCalib,
+    geo: { cx: center.x, cy: center.y, rx: defR, ry: defR * 0.85 },
+    svgG: null,
+  };
+  S.rois.push(roi);
+  if (isCalib) { if (S.calibId) removeRoi(S.calibId); S.calibId = roi.id; }
+  buildRoiSvg(roi);
+  activateRoi(roi.id);
+  renderRoiList(); updateStatus(); updateToolbar();
+  return roi;
+}
+
+function addPolyRoi(name, points) {
+  const roi = { id: uid(), name, type: 'polygon', isCalib: false, geo: { points: points.map(p => ({ ...p })) }, svgG: null };
+  S.rois.push(roi);
+  buildRoiSvg(roi);
+  activateRoi(roi.id);
+  renderRoiList(); updateStatus(); updateToolbar();
+  return roi;
+}
+
+// ── POLY PREVIEW ─────────────────────────────────
+function renderPolyPreview() {
+  lPoly.innerHTML = '';
+  const pts = S.polyPts; if (!pts.length) return;
+  const color = '#e8ff47';
+  if (pts.length >= 2) {
+    lPoly.appendChild(mkSvg('path', { d: 'M'+pts.map(p=>`${p.x},${p.y}`).join('L'), fill:'none', stroke:color, 'stroke-width':1.5, 'stroke-dasharray':'7 4', 'pointer-events':'none' }));
+  }
+  pts.forEach(p => lPoly.appendChild(mkSvg('circle', { cx:p.x, cy:p.y, r:9, fill:color, stroke:'#0d0f14', 'stroke-width':2, 'pointer-events':'none' })));
+  if (pts.length >= 3) {
+    lPoly.appendChild(mkSvg('circle', { cx:pts[0].x, cy:pts[0].y, r:16, fill:'none', stroke:color, 'stroke-width':1.5, 'stroke-dasharray':'4 3', opacity:0.5, 'pointer-events':'none' }));
+  }
+}
+
+function closePoly() {
+  if (S.polyPts.length < 3) return;
+  addPolyRoi(S.polyName || ('Poly_' + S._roiSeq), S.polyPts);
+  S.polyPts = []; S.polyName = ''; lPoly.innerHTML = '';
+  setMode('select');
+}
+
+function cancelPoly() { S.polyPts = []; S.polyName = ''; lPoly.innerHTML = ''; }
+
+// ── BUILD ROI SVG ─────────────────────────────────
+function buildRoiSvg(roi) {
+  if (roi.svgG) roi.svgG.remove();
+  const isActive = roi.id === S.activeId;
+  const color = roiColor(roi);
+  const g = document.createElementNS(NS, 'g');
+  g.dataset.roiId = roi.id;
+
+  if (roi.type === 'ellipse') {
+    g.appendChild(mkSvg('ellipse', {
+      cx: roi.geo.cx, cy: roi.geo.cy, rx: roi.geo.rx, ry: roi.geo.ry,
+      fill: color + (isActive ? '55' : '28'),
+      stroke: color,
+      'stroke-width': isActive ? 2 : 0.8,
+      opacity: isActive ? 1 : 0.5,
+      'pointer-events': 'none',
+    }));
+    // Axis labels for calibration ellipse
+    if (roi.isCalib) {
+      const rxLine = mkSvg('line', { x1:roi.geo.cx, y1:roi.geo.cy, x2:roi.geo.cx+roi.geo.rx, y2:roi.geo.cy, stroke:color, 'stroke-width':1, 'stroke-dasharray':'3 2', 'pointer-events':'none', opacity:'0.6' });
+      const ryLine = mkSvg('line', { x1:roi.geo.cx, y1:roi.geo.cy, x2:roi.geo.cx, y2:roi.geo.cy+roi.geo.ry, stroke:'#ff9f43', 'stroke-width':1, 'stroke-dasharray':'3 2', 'pointer-events':'none', opacity:'0.6' });
+      g.appendChild(rxLine); g.appendChild(ryLine);
+    }
+  } else {
+    g.appendChild(mkSvg('polygon', {
+      points: roi.geo.points.map(p=>`${p.x},${p.y}`).join(' '),
+      fill: color + (isActive ? '55' : '28'),
+      stroke: color,
+      'stroke-width': isActive ? 2 : 0.8,
+      opacity: isActive ? 1 : 0.5,
+      'pointer-events': 'none',
+    }));
+  }
+
+  lRoi.appendChild(g);
+  roi.svgG = g;
+  buildHandles(roi);
+}
+
+function rebuildRoi(roi) { buildRoiSvg(roi); }
+
+function buildHandles(roi) {
+  lHandles.querySelectorAll(`[data-hroi="${roi.id}"]`).forEach(el => el.remove());
+  if (roi.id !== S.activeId) return;
+  const color = roiColor(roi);
+
+  if (roi.type === 'ellipse') {
+    // Center handle
+    const ch = mkSvg('circle', { cx:roi.geo.cx, cy:roi.geo.cy, r:HANDLE_HIT/2, fill:color, stroke:'#0d0f14', 'stroke-width':2, cursor:'move' });
+    ch.dataset.htype = 'cc'; ch.dataset.hroi = roi.id;
+    lHandles.appendChild(ch);
+    attachHandleDrag(ch, roi, (roi, cur, sg, dx, dy) => { roi.geo.cx = sg.cx+dx; roi.geo.cy = sg.cy+dy; });
+
+    // RX handle (east) — cyan colored to match X axis
+    const rxh = mkSvg('rect', {
+      x: roi.geo.cx+roi.geo.rx-HANDLE_HIT/2, y: roi.geo.cy-HANDLE_HIT/2,
+      width: HANDLE_HIT, height: HANDLE_HIT,
+      fill: '#47ffe8', stroke: '#0d0f14', 'stroke-width': 2, rx: 3, cursor: 'ew-resize',
+    });
+    rxh.dataset.htype = 'rx'; rxh.dataset.hroi = roi.id;
+    lHandles.appendChild(rxh);
+    attachHandleDrag(rxh, roi, (roi, cur) => { roi.geo.rx = Math.max(4, Math.abs(cur.x - roi.geo.cx)); });
+
+    // RY handle (south) — orange colored to match Y axis
+    const ryh = mkSvg('rect', {
+      x: roi.geo.cx-HANDLE_HIT/2, y: roi.geo.cy+roi.geo.ry-HANDLE_HIT/2,
+      width: HANDLE_HIT, height: HANDLE_HIT,
+      fill: '#ff9f43', stroke: '#0d0f14', 'stroke-width': 2, rx: 3, cursor: 'ns-resize',
+    });
+    ryh.dataset.htype = 'ry'; ryh.dataset.hroi = roi.id;
+    lHandles.appendChild(ryh);
+    attachHandleDrag(ryh, roi, (roi, cur) => { roi.geo.ry = Math.max(4, Math.abs(cur.y - roi.geo.cy)); });
+
+  } else {
+    // Polygon vertex handles
+    roi.geo.points.forEach((p, i) => {
+      const h = mkSvg('circle', { cx:p.x, cy:p.y, r:HANDLE_HIT/2, fill:color, stroke:'#0d0f14', 'stroke-width':2, cursor:'move' });
+      h.dataset.htype = 'pv'; h.dataset.hroiIdx = i; h.dataset.hroi = roi.id;
+      lHandles.appendChild(h);
+      attachHandleDrag(h, roi, (roi, cur, sg, dx, dy) => {
+        roi.geo.points[i].x = sg.points[i].x+dx;
+        roi.geo.points[i].y = sg.points[i].y+dy;
+      });
+      let lpt = null;
+      h.addEventListener('touchstart', () => { lpt = setTimeout(() => { if (roi.geo.points.length > 3) { roi.geo.points.splice(i,1); rebuildRoi(roi); } }, 600); }, { passive: true });
+      ['touchend','touchmove'].forEach(ev => h.addEventListener(ev, () => clearTimeout(lpt)));
+    });
+  }
+}
+
+// ── HANDLE DRAG ───────────────────────────────────
+function attachHandleDrag(el, roi, moveFn) {
+  let startSvg = null, startGeo = null;
+  function begin(cx, cy) {
+    startSvg = clientToSvg(cx, cy);
+    startGeo = JSON.parse(JSON.stringify(roi.geo));
+    S.drag = true; panState = null; pinchState = null;
+  }
+  function move(cx, cy) {
+    if (!S.drag || !startSvg) return;
+    const cur = clientToSvg(cx, cy);
+    moveFn(roi, cur, startGeo, cur.x-startSvg.x, cur.y-startSvg.y);
+    syncRoiSvg(roi);
+  }
+  function end() { S.drag = false; startSvg = null; startGeo = null; }
+
+  el.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); begin(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  el.addEventListener('touchmove',  e => { e.stopPropagation(); e.preventDefault(); move(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  el.addEventListener('touchend',   e => { e.stopPropagation(); end(); });
+  el.addEventListener('mousedown',  e => {
+    e.stopPropagation(); e.preventDefault(); begin(e.clientX, e.clientY);
+    const mm = ev => move(ev.clientX, ev.clientY);
+    const mu = () => { end(); document.removeEventListener('mousemove',mm); document.removeEventListener('mouseup',mu); };
+    document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
+  });
+}
+
+// ── SYNC SVG (fast drag path) ─────────────────────
+function syncRoiSvg(roi) {
+  if (!roi.svgG) return;
+  if (roi.type === 'ellipse') {
+    const el = roi.svgG.querySelector('ellipse');
+    if (el) { el.setAttribute('cx',roi.geo.cx); el.setAttribute('cy',roi.geo.cy); el.setAttribute('rx',roi.geo.rx); el.setAttribute('ry',roi.geo.ry); }
+    // Update axis lines for calib ellipse
+    if (roi.isCalib) {
+      const lines = roi.svgG.querySelectorAll('line');
+      if (lines[0]) { lines[0].setAttribute('x1',roi.geo.cx); lines[0].setAttribute('y1',roi.geo.cy); lines[0].setAttribute('x2',roi.geo.cx+roi.geo.rx); lines[0].setAttribute('y2',roi.geo.cy); }
+      if (lines[1]) { lines[1].setAttribute('x1',roi.geo.cx); lines[1].setAttribute('y1',roi.geo.cy); lines[1].setAttribute('x2',roi.geo.cx); lines[1].setAttribute('y2',roi.geo.cy+roi.geo.ry); }
+    }
+    const ch = lHandles.querySelector(`[data-htype="cc"][data-hroi="${roi.id}"]`);
+    if (ch) { ch.setAttribute('cx',roi.geo.cx); ch.setAttribute('cy',roi.geo.cy); }
+    const rxh = lHandles.querySelector(`[data-htype="rx"][data-hroi="${roi.id}"]`);
+    if (rxh) { rxh.setAttribute('x',roi.geo.cx+roi.geo.rx-HANDLE_HIT/2); rxh.setAttribute('y',roi.geo.cy-HANDLE_HIT/2); }
+    const ryh = lHandles.querySelector(`[data-htype="ry"][data-hroi="${roi.id}"]`);
+    if (ryh) { ryh.setAttribute('x',roi.geo.cx-HANDLE_HIT/2); ryh.setAttribute('y',roi.geo.cy+roi.geo.ry-HANDLE_HIT/2); }
+  } else {
+    const poly = roi.svgG.querySelector('polygon');
+    if (poly) poly.setAttribute('points', roi.geo.points.map(p=>`${p.x},${p.y}`).join(' '));
+    lHandles.querySelectorAll(`[data-htype="pv"][data-hroi="${roi.id}"]`).forEach((h,i) => {
+      if (roi.geo.points[i]) { h.setAttribute('cx',roi.geo.points[i].x); h.setAttribute('cy',roi.geo.points[i].y); }
+    });
+  }
+}
+
+// ── INSERT POLY POINT ─────────────────────────────
+function insertPolyPoint(roi, pt) {
+  const pts = roi.geo.points;
+  let bestDist = Infinity, bestIdx = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const d = ptSegDist(pt, pts[i], pts[(i+1)%pts.length]);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  pts.splice(bestIdx+1, 0, { ...pt });
+  rebuildRoi(roi);
+}
+function ptSegDist(p, a, b) {
+  const dx=b.x-a.x, dy=b.y-a.y, l2=dx*dx+dy*dy;
+  if (!l2) return Math.hypot(p.x-a.x, p.y-a.y);
+  const t = Math.max(0, Math.min(1, ((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));
+  return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
+}
+
+// ── ACTIVATE / REMOVE ROI ─────────────────────────
+function activateRoi(id) {
+  S.activeId = id;
+  S.rois.forEach(r => rebuildRoi(r));
+  updateStatus(); updateToolbar();
+}
+
+function removeRoi(id) {
+  const roi = getRoi(id); if (!roi) return;
+  if (roi.svgG) roi.svgG.remove();
+  lHandles.querySelectorAll(`[data-hroi="${id}"]`).forEach(el => el.remove());
+  S.rois = S.rois.filter(r => r.id !== id);
+  if (S.calibId === id) S.calibId = null;
+  if (S.activeId === id) S.activeId = S.rois.length ? S.rois[S.rois.length-1].id : null;
+  if (S.activeId) activateRoi(S.activeId);
+  renderRoiList(); updateStatus(); updateToolbar();
+}
+
+// ── ROI LIST ──────────────────────────────────────
+function renderRoiList() {
+  roiPanelInner.innerHTML = '';
+  if (!S.rois.length) { roiPanelInner.innerHTML = '<div class="rpempty">Keine ROIs vorhanden</div>'; roiCount.textContent = ''; return; }
+  roiCount.textContent = `(${S.rois.length})`;
+  S.rois.forEach(roi => {
+    const color = roiColor(roi);
+    const div = document.createElement('div');
+    div.className = 'rpitem' + (roi.id === S.activeId ? ' active' : '');
+    const dot = document.createElement('div'); dot.className = 'rpdot'; dot.style.background = color;
+    const name = document.createElement('div'); name.className = 'rpname'; name.textContent = roi.name;
+    const type = document.createElement('div'); type.className = 'rptype';
+    type.textContent = roi.isCalib ? '⊙' : roi.type === 'ellipse' ? '○' : '⬡';
+    const del = document.createElement('div'); del.className = 'rpdel'; del.textContent = '✕';
+    del.addEventListener('click', e => { e.stopPropagation(); removeRoi(roi.id); });
+    del.addEventListener('touchend', e => { e.stopPropagation(); e.preventDefault(); removeRoi(roi.id); });
+    let lpt = null;
+    div.addEventListener('touchstart', () => { lpt = setTimeout(() => { mRenameInput.value = roi.name; mRenameOk._roiId = roi.id; openModal(mRename); }, 600); }, { passive: true });
+    ['touchend','touchmove'].forEach(ev => div.addEventListener(ev, () => clearTimeout(lpt)));
+    div.addEventListener('click', e => { if (e.target === del) return; activateRoi(roi.id); S.roiPanelOpen = false; roiPanel.classList.remove('open'); });
+    div.appendChild(dot); div.appendChild(name); div.appendChild(type); div.appendChild(del);
+    roiPanelInner.appendChild(div);
+  });
+}
+
+// ── JSON EXPORT ───────────────────────────────────
+function edgeAngle(a, b) { let d = Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI; if(d<0)d+=360; return Math.round(d*10)/10; }
+function r2(v) { return Math.round(v*100)/100; }
+
+btnExport.addEventListener('click', () => {
+  const cal = isCalibrated();
+  const ux = S.unitPerPxX || 1, uy = S.unitPerPxY || 1;
+
+  const data = {
+    meta: {
+      tool: 'WorldMapper v3.0',
+      exportedAt: new Date().toISOString(),
+      imageSize: S.img ? { width: S.img.w, height: S.img.h } : null,
+      calibrated: cal,
+      unitPerPxX: S.unitPerPxX ?? null,
+      unitPerPxY: S.unitPerPxY ?? null,
+      catchRadiusUnits: S.catchRadiusUnits ?? null,
+      coordinateOrigin: 'top-left',
+    },
+    rois: S.rois.map(roi => {
+      const base = { id: roi.id, name: roi.name, type: roi.type, isCalibrationROI: !!roi.isCalib, group: 'new' };
+      if (roi.type === 'ellipse') {
+        const g = roi.geo;
+        return {
+          ...base,
+          pixels: { cx: r2(g.cx), cy: r2(g.cy), rx: r2(g.rx), ry: r2(g.ry) },
+          units: cal ? { cx: r2(g.cx*ux), cy: r2(g.cy*uy), rx: r2(g.rx*ux), ry: r2(g.ry*uy) } : null,
+        };
+      } else {
+        const pts = roi.geo.points;
+        const edges = pts.map((p,i) => {
+          const n = pts[(i+1)%pts.length];
+          const lenPx = Math.hypot(n.x-p.x, n.y-p.y);
+          // For anisotropic scale, scale each component separately for true unit length
+          const dxU = (n.x-p.x)*ux, dyU = (n.y-p.y)*uy;
+          return {
+            from: i, to: (i+1)%pts.length,
+            lengthPx: r2(lenPx),
+            lengthUnits: cal ? r2(Math.hypot(dxU,dyU)) : null,
+            angleDeg: edgeAngle(p,n),
+          };
+        });
+        return {
+          ...base,
+          pixels: { points: pts.map(p => ({ x: r2(p.x), y: r2(p.y) })) },
+          units: cal ? { points: pts.map(p => ({ x: r2(p.x*ux), y: r2(p.y*uy) })) } : null,
+          edges,
+        };
+      }
+    }),
+  };
+
+  const blob = new Blob([JSON.stringify(data,null,2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'worldmap_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click(); URL.revokeObjectURL(url);
+});
+
+document.addEventListener('contextmenu', e => e.preventDefault());
+updateStatus(); updateToolbar();
+</script>
+
+</body>
+</html>
